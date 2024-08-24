@@ -10,7 +10,7 @@ var TypeBishop uint = 0b00100
 var TypeQueen uint = 0b00101
 var TypeKing uint = 0b00110
 
-func PieceValue(pieceChar rune) uint {
+func Value(pieceChar rune) uint {
 	switch pieceChar {
 	case 'r':
 		return ColorBlack | TypeRook
