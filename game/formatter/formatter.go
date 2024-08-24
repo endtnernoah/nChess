@@ -2,29 +2,30 @@ package formatter
 
 import (
 	"endtner.dev/nChess/game/board"
+	"endtner.dev/nChess/game/piece"
 	"fmt"
 	"strings"
 )
 
 func BitboardMappingWhite(b *board.Board) map[uint64]string {
 	return map[uint64]string{
-		b.WhitePawns():   "♙",
-		b.WhiteRooks():   "♖",
-		b.WhiteKnights(): "♘",
-		b.WhiteBishops(): "♗",
-		b.WhiteQueens():  "♕",
-		b.WhiteKing():    "♔",
+		b.PieceBitboard(piece.ColorWhite | piece.TypePawn):   "♙",
+		b.PieceBitboard(piece.ColorWhite | piece.TypeRook):   "♖",
+		b.PieceBitboard(piece.ColorWhite | piece.TypeKnight): "♘",
+		b.PieceBitboard(piece.ColorWhite | piece.TypeBishop): "♗",
+		b.PieceBitboard(piece.ColorWhite | piece.TypeQueen):  "♕",
+		b.PieceBitboard(piece.ColorWhite | piece.TypeKing):   "♔",
 	}
 }
 
 func BitboardMappingBlack(b *board.Board) map[uint64]string {
 	return map[uint64]string{
-		b.BlackPawns():   "♟",
-		b.BlackRooks():   "♜",
-		b.BlackKnights(): "♞",
-		b.BlackBishops(): "♝",
-		b.BlackQueens():  "♛",
-		b.BlackKing():    "♚",
+		b.PieceBitboard(piece.ColorBlack | piece.TypePawn):   "♟",
+		b.PieceBitboard(piece.ColorBlack | piece.TypeRook):   "♜",
+		b.PieceBitboard(piece.ColorBlack | piece.TypeKnight): "♞",
+		b.PieceBitboard(piece.ColorBlack | piece.TypeBishop): "♝",
+		b.PieceBitboard(piece.ColorBlack | piece.TypeQueen):  "♛",
+		b.PieceBitboard(piece.ColorBlack | piece.TypeKing):   "♚",
 	}
 }
 
@@ -45,10 +46,10 @@ func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
 	}
 
 	// Setting pieces
-	for bitboard, piece := range bitboardMapping {
+	for bitboard, p := range bitboardMapping {
 		for i := 0; i < 64; i++ {
 			if bitboard&(1<<i) != 0 {
-				unicodeBoard[i] = piece
+				unicodeBoard[i] = p
 			}
 		}
 	}
@@ -56,10 +57,11 @@ func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
 }
 
 func FormatUnicodeBoard(board []string) string {
+	// Hate that function
 	var result strings.Builder
 
 	for i := 63; i >= 0; i -= 8 {
-		for j := 0; j < 8; j++ {
+		for j := 7; j >= 0; j-- {
 			result.WriteString(board[i-j])
 			result.WriteString(" ")
 		}
@@ -69,6 +71,7 @@ func FormatUnicodeBoard(board []string) string {
 }
 
 func FormatUnicodeBoardWithBorders(board []string) string {
+	// Hate that function too
 	var result strings.Builder
 
 	// Unicode box-drawing characters
@@ -99,8 +102,8 @@ func FormatUnicodeBoardWithBorders(board []string) string {
 		result.WriteString(fmt.Sprintf("%d", rank)) // Rank number
 		result.WriteString(vertical)
 		for file := 0; file < 8; file++ {
-			index := (rank-1)*8 + (7 - file)
-			result.WriteString(fmt.Sprintf(" %s ", board[63-index]))
+			index := (rank-1)*8 + file
+			result.WriteString(fmt.Sprintf(" %s ", board[index]))
 			result.WriteString(vertical)
 		}
 		result.WriteString(fmt.Sprintf("%d\n", rank)) // Rank number
