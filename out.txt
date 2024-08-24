@@ -1,0 +1,164 @@
+   a   b   c   d   e   f   g   h  
+ ┌───┬───┬───┬───┬───┬───┬───┬───┐
+8│ ♜ │ ♞ │ ♝ │ ♛ │ ♚ │ ♝ │ ♞ │ ♜ │8
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+7│ ♟ │ ♟ │ ♟ │ ♟ │ ♟ │ ♟ │ ♟ │ ♟ │7
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+6│   │   │   │   │   │   │   │   │6
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+5│   │   │   │   │   │   │   │   │5
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+4│   │   │   │   │   │   │   │   │4
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+3│   │   │   │   │   │   │   │   │3
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+2│ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │2
+ ├───┼───┼───┼───┼───┼───┼───┼───┤
+1│ ♖ │ ♘ │ ♗ │ ♕ │ ♔ │ ♗ │ ♘ │ ♖ │1
+ └───┴───┴───┴───┴───┴───┴───┴───┘
+   a   b   c   d   e   f   g   h  
+
+Ply 2, White to move, 20 legal moves
+Ply 2, Move 1/20: Move(from: a2, to: a3)
+Ply 1, Black to move, 20 legal moves
+Ply 1, Move 1/20: Move(from: a7, to: a6)
+Found 1 nodes for this move
+Ply 1, Move 2/20: Move(from: a7, to: a5)
+Found 1 nodes for this move
+Ply 1, Move 3/20: Move(from: b7, to: b6)
+Found 1 nodes for this move
+Ply 1, Move 4/20: Move(from: b7, to: b5)
+Found 1 nodes for this move
+Ply 1, Move 5/20: Move(from: c7, to: c6)
+Found 1 nodes for this move
+Ply 1, Move 6/20: Move(from: c7, to: c5)
+Found 1 nodes for this move
+Ply 1, Move 7/20: Move(from: d7, to: d6)
+Found 1 nodes for this move
+Ply 1, Move 8/20: Move(from: d7, to: d5)
+Found 1 nodes for this move
+Ply 1, Move 9/20: Move(from: e7, to: e6)
+Found 1 nodes for this move
+Ply 1, Move 10/20: Move(from: e7, to: e5)
+Found 1 nodes for this move
+Ply 1, Move 11/20: Move(from: f7, to: f6)
+Found 1 nodes for this move
+Ply 1, Move 12/20: Move(from: f7, to: f5)
+Found 1 nodes for this move
+Ply 1, Move 13/20: Move(from: g7, to: g6)
+Found 1 nodes for this move
+Ply 1, Move 14/20: Move(from: g7, to: g5)
+Found 1 nodes for this move
+Ply 1, Move 15/20: Move(from: h7, to: h6)
+Found 1 nodes for this move
+Ply 1, Move 16/20: Move(from: h7, to: h5)
+Found 1 nodes for this move
+Ply 1, Move 17/20: Move(from: b8, to: c6)
+Found 1 nodes for this move
+Ply 1, Move 18/20: Move(from: b8, to: a6)
+Found 1 nodes for this move
+Ply 1, Move 19/20: Move(from: g8, to: h6)
+Found 1 nodes for this move
+Ply 1, Move 20/20: Move(from: g8, to: f6)
+Found 1 nodes for this move
+Total nodes at ply 1: 20
+
+Found 20 nodes for this move
+Ply 2, Move 2/20: Move(from: a2, to: a4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 3/20: Move(from: b2, to: b3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 4/20: Move(from: b2, to: b4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 5/20: Move(from: c2, to: c3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 6/20: Move(from: c2, to: c4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 7/20: Move(from: d2, to: d3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 8/20: Move(from: d2, to: d4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 9/20: Move(from: e2, to: e3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 10/20: Move(from: e2, to: e4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 11/20: Move(from: f2, to: f3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 12/20: Move(from: f2, to: f4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 13/20: Move(from: g2, to: g3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 14/20: Move(from: g2, to: g4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 15/20: Move(from: h2, to: h3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 16/20: Move(from: h2, to: h4)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 17/20: Move(from: b1, to: a3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 18/20: Move(from: b1, to: c3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 19/20: Move(from: g1, to: f3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Ply 2, Move 20/20: Move(from: g1, to: h3)
+Ply 1, Black to move, 0 legal moves
+Total nodes at ply 1: 0
+
+Found 0 nodes for this move
+Total nodes at ply 2: 20
+
+Perft(2) = 20

@@ -2,6 +2,7 @@ package board
 
 import (
 	"endtner.dev/nChess/game/boardhelper"
+	"endtner.dev/nChess/game/move"
 	"endtner.dev/nChess/game/piece"
 	"fmt"
 	"math/bits"
@@ -25,6 +26,8 @@ type Board struct {
 	whitePieces uint64
 	blackPieces uint64
 	occupied    uint64
+
+	bitboardStack [][]uint64
 }
 
 func New(fenString string) *Board {
@@ -64,28 +67,75 @@ func New(fenString string) *Board {
 
 		boardPosition++
 	}
-	// Setting the occupied fields
-	for p, bitboard := range b.bitboards {
-		if uint(p)&piece.ColorWhite == piece.ColorWhite {
-			b.whitePieces |= bitboard
-		}
-		if uint(p)&piece.ColorBlack == piece.ColorBlack {
-			b.blackPieces |= bitboard
-		}
-	}
 
-	b.occupied = b.whitePieces | b.blackPieces
-
-	b.UpdateWhiteAttackBitboard()
-	b.UpdateBlackAttackBitboard()
-	b.UpdateWhitePinnedPieces()
-	b.UpdateBlackPinnedPieces()
+	// Update shit like the whitePieces, whiteAttacks, pinned Pieces...
+	b.Update()
 
 	return &b
 }
 
+func (b *Board) MakeMove(move move.Move) {
+	// Put current bitboards on the stack
+	copiedBitboards := make([]uint64, len(b.bitboards))
+	copy(copiedBitboards, b.bitboards)
+	b.bitboardStack = append(b.bitboardStack, copiedBitboards)
+
+	// Get moved piece
+	movedPiece := b.GetPieceAtIndex(move.StartIndex)
+
+	// Remove piece from source square
+	b.setPieceBitboard(movedPiece, b.PieceBitboard(movedPiece) & ^(1<<move.StartIndex))
+
+	// Possibly remove captured piece
+	capturedPiece := b.GetPieceAtIndex(move.TargetIndex)
+	if capturedPiece != 0 && ((capturedPiece&0b11000)&(movedPiece&0b11000)) == 0 {
+		b.setPieceBitboard(capturedPiece, b.PieceBitboard(capturedPiece) & ^(1<<move.TargetIndex))
+	}
+
+	// Add new piece on the target square
+	if move.IsPromotion {
+		newQueen := piece.TypeQueen | (movedPiece & 0b11000)
+		b.setPieceBitboard(newQueen, b.PieceBitboard(newQueen)|(1<<move.TargetIndex))
+	} else {
+		b.setPieceBitboard(movedPiece, b.PieceBitboard(movedPiece)|(1<<move.TargetIndex))
+	}
+
+	// Update all bitboards
+	b.Update()
+}
+
+func (b *Board) UnmakeMove() {
+	if len(b.bitboardStack) == 0 {
+		return
+	}
+
+	b.bitboards = b.bitboardStack[len(b.bitboardStack)-1]
+	b.bitboardStack = b.bitboardStack[:len(b.bitboardStack)-1]
+
+	b.Update()
+}
+
 func (b *Board) PieceBitboard(piece uint) uint64 {
 	return b.bitboards[piece]
+}
+
+func (b *Board) setPieceBitboard(piece uint, bitboard uint64) { b.bitboards[piece] = bitboard }
+
+func (b *Board) GetPieceAtIndex(index int) uint {
+	if index < 0 || index > 63 {
+		return 0 // Invalid index
+	}
+
+	for pieceType := uint(0); pieceType < 6; pieceType++ {
+		if boardhelper.IsIndexBitSet(index, b.PieceBitboard(pieceType|piece.ColorWhite)) {
+			return pieceType | piece.ColorWhite
+		}
+		if boardhelper.IsIndexBitSet(index, b.PieceBitboard(pieceType|piece.ColorBlack)) {
+			return pieceType | piece.ColorBlack
+		}
+	}
+
+	return 0 // No piece found
 }
 
 func (b *Board) WhitePieces() uint64 {
@@ -98,6 +148,14 @@ func (b *Board) BlackPieces() uint64 {
 
 func (b *Board) Occupied() uint64 {
 	return b.occupied
+}
+
+func (b *Board) Update() {
+	b.UpdateBitboards()
+	b.UpdateWhiteAttackBitboard()
+	b.UpdateBlackAttackBitboard()
+	b.UpdateWhitePinnedPieces()
+	b.UpdateBlackPinnedPieces()
 }
 
 func (b *Board) UpdateWhiteAttackBitboard() {
@@ -202,6 +260,20 @@ func (b *Board) UpdateBlackPinnedPieces() {
 	b.BlackPinnedPieces = straightPinnedPieces | diagonalPinnedPieces
 }
 
+func (b *Board) UpdateBitboards() {
+	// Setting the occupied fields
+	for p, bitboard := range b.bitboards {
+		if uint(p)&piece.ColorWhite == piece.ColorWhite {
+			b.whitePieces |= bitboard
+		}
+		if uint(p)&piece.ColorBlack == piece.ColorBlack {
+			b.blackPieces |= bitboard
+		}
+	}
+
+	b.occupied = b.whitePieces | b.blackPieces
+}
+
 func pawnAttackBitboard(pieceBitboard uint64, ownPiecesBitboard uint64, pawnIndexOffset int) uint64 {
 	var pawnAttacks uint64
 
@@ -217,11 +289,9 @@ func pawnAttackBitboard(pieceBitboard uint64, ownPiecesBitboard uint64, pawnInde
 
 		// Add move if it is in the same target row and targets are not empty
 		if side1/8 == (startIndex+pawnIndexOffset)/8 && !boardhelper.IsIndexBitSet(side1, ownPiecesBitboard) {
-			fmt.Printf("Pawn attack on %s\n", boardhelper.IndexToSquare(side1))
 			pawnAttacks |= 1 << side1
 		}
 		if side2/8 == (startIndex+pawnIndexOffset)/8 && !boardhelper.IsIndexBitSet(side2, ownPiecesBitboard) {
-			fmt.Printf("Pawn attack on %s\n", boardhelper.IndexToSquare(side2))
 			pawnAttacks |= 1 << side2
 		}
 
