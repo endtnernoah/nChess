@@ -19,8 +19,8 @@ type Board struct {
 	WhiteAttackFields uint64
 	BlackAttackFields uint64
 
-	whitePinnedPieces uint64
-	blackPinnedPieces uint64
+	WhitePinnedPieces uint64
+	BlackPinnedPieces uint64
 
 	whitePieces uint64
 	blackPieces uint64
@@ -78,6 +78,8 @@ func New(fenString string) *Board {
 
 	b.UpdateWhiteAttackBitboard()
 	b.UpdateBlackAttackBitboard()
+	b.UpdateWhitePinnedPieces()
+	b.UpdateBlackPinnedPieces()
 
 	return &b
 }
@@ -160,6 +162,44 @@ func (b *Board) UpdateBlackAttackBitboard() {
 		blackDiagonalSlidingAttacks |
 		blackDiagonalKingAttacks |
 		blackKnightAttacks
+}
+
+func (b *Board) UpdateWhitePinnedPieces() {
+	blackStraightAttackers := b.PieceBitboard(piece.ColorBlack|piece.TypeRook) | b.PieceBitboard(piece.ColorBlack|piece.TypeQueen)
+	blackDiagonalAttackers := b.PieceBitboard(piece.ColorBlack|piece.TypeBishop) | b.PieceBitboard(piece.ColorBlack|piece.TypeQueen)
+
+	straightPinnedPieces := straightPinnedPiecesBitboard(
+		b.PieceBitboard(piece.ColorWhite|piece.TypeKing),
+		b.whitePieces,
+		blackStraightAttackers,
+		b.blackPieces&^blackStraightAttackers)
+
+	diagonalPinnedPieces := diagonalPinnedPiecesBitboard(
+		b.PieceBitboard(piece.ColorWhite|piece.TypeKing),
+		b.whitePieces,
+		blackDiagonalAttackers,
+		b.blackPieces&^blackDiagonalAttackers)
+
+	b.WhitePinnedPieces = straightPinnedPieces | diagonalPinnedPieces
+}
+
+func (b *Board) UpdateBlackPinnedPieces() {
+	whiteStraightAttackers := b.PieceBitboard(piece.ColorWhite|piece.TypeRook) | b.PieceBitboard(piece.ColorBlack|piece.TypeQueen)
+	whiteDiagonalAttackers := b.PieceBitboard(piece.ColorWhite|piece.TypeBishop) | b.PieceBitboard(piece.ColorBlack|piece.TypeQueen)
+
+	straightPinnedPieces := straightPinnedPiecesBitboard(
+		b.PieceBitboard(piece.ColorBlack|piece.TypeKing),
+		b.blackPieces,
+		whiteStraightAttackers,
+		b.whitePieces&^whiteStraightAttackers)
+
+	diagonalPinnedPieces := diagonalPinnedPiecesBitboard(
+		b.PieceBitboard(piece.ColorBlack|piece.TypeKing),
+		b.blackPieces,
+		whiteDiagonalAttackers,
+		b.whitePieces&^whiteDiagonalAttackers)
+
+	b.BlackPinnedPieces = straightPinnedPieces | diagonalPinnedPieces
 }
 
 func pawnAttackBitboard(pieceBitboard uint64, ownPiecesBitboard uint64, pawnIndexOffset int) uint64 {
@@ -274,4 +314,106 @@ func knightAttackBitboard(pieceBitboard uint64, ownPiecesBitboard uint64) uint64
 	}
 
 	return knightAttacks
+}
+
+func straightPinnedPiecesBitboard(kingBitboard uint64, ownPiecesBitboard uint64, attackingEnemyPiecesBitboard uint64, otherEnemyPiecesBitboard uint64) uint64 {
+	straightIndexOffsets := []int{-1, 1, -8, 8}
+	var pinnedPieces uint64
+
+	for kingBitboard != 0 {
+		kingIndex := bits.TrailingZeros64(kingBitboard)
+
+		for _, offset := range straightIndexOffsets {
+			rayIndex := kingIndex + offset
+			ownPieceIndex := -1
+
+			// Go as long as the ray moves to valid fields
+			for boardhelper.IsValidStraightMove(kingIndex, rayIndex) {
+
+				// Hit our own piece
+				if boardhelper.IsIndexBitSet(rayIndex, ownPiecesBitboard) {
+
+					// Hit own piece 2 times in a row
+					if ownPieceIndex != -1 {
+						break
+					}
+
+					// Hit own piece first time
+					ownPieceIndex = rayIndex
+				}
+
+				// Hit enemy attacking piece
+				if boardhelper.IsIndexBitSet(rayIndex, attackingEnemyPiecesBitboard) {
+
+					// If we have hit our own piece before, that piece is pinned
+					if ownPieceIndex != -1 {
+						pinnedPieces |= 1 << ownPieceIndex
+						break
+					}
+
+					// Fun fact: we are in check if the code comes to this comment
+				}
+
+				// Hit any other enemy piece
+				if boardhelper.IsIndexBitSet(rayIndex, otherEnemyPiecesBitboard) {
+					break // Can just exit, no matter if we hit our own piece first, there is an enemy piece in the way of possible attackers
+				}
+			}
+		}
+
+		kingBitboard &= kingBitboard - 1
+	}
+
+	return pinnedPieces
+}
+
+func diagonalPinnedPiecesBitboard(kingBitboard uint64, ownPiecesBitboard uint64, attackingEnemyPiecesBitboard uint64, otherEnemyPiecesBitboard uint64) uint64 {
+	diagonalIndexOffsets := []int{-7, 7, -9, 9}
+	var pinnedPieces uint64
+
+	for kingBitboard != 0 {
+		kingIndex := bits.TrailingZeros64(kingBitboard)
+
+		for _, offset := range diagonalIndexOffsets {
+			rayIndex := kingIndex + offset
+			ownPieceIndex := -1
+
+			// Go as long as the ray moves to valid fields
+			for boardhelper.IsValidStraightMove(kingIndex, rayIndex) {
+
+				// Hit our own piece
+				if boardhelper.IsIndexBitSet(rayIndex, ownPiecesBitboard) {
+
+					// Hit own piece 2 times in a row
+					if ownPieceIndex != -1 {
+						break
+					}
+
+					// Hit own piece first time
+					ownPieceIndex = rayIndex
+				}
+
+				// Hit enemy attacking piece
+				if boardhelper.IsIndexBitSet(rayIndex, attackingEnemyPiecesBitboard) {
+
+					// If we have hit our own piece before, that piece is pinned
+					if ownPieceIndex != -1 {
+						pinnedPieces |= 1 << ownPieceIndex
+						break
+					}
+
+					// Fun fact: we are in check if the code comes to this comment
+				}
+
+				// Hit any other enemy piece
+				if boardhelper.IsIndexBitSet(rayIndex, otherEnemyPiecesBitboard) {
+					break // Can just exit, no matter if we hit our own piece first, there is an enemy piece in the way of possible attackers
+				}
+			}
+		}
+
+		kingBitboard &= kingBitboard - 1
+	}
+
+	return pinnedPieces
 }
