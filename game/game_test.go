@@ -18,9 +18,8 @@ func doPerftTest(positionName string, positionFen string, expectedPerftResults [
 
 		start := time.Now()
 		perftResult := g.Perft(i)
-		elapsedTime := time.Since(start)
 
-		resultString.WriteString(fmt.Sprintf("[%s] Perft(%d) %d, (Expected %d), match=%t, runtime=%dms\n", positionName, i, perftResult, expectedPerftResults[i], perftResult == expectedPerftResults[i], elapsedTime/1000/1000))
+		resultString.WriteString(fmt.Sprintf("[%s] Perft(%d) %d, (Expected %d), match=%t, runtime=%s\n", positionName, i, perftResult, expectedPerftResults[i], perftResult == expectedPerftResults[i], time.Since(start)))
 		if expectedPerftResults[i] != perftResult {
 			testingResult = false
 		}

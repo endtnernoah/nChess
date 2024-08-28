@@ -235,15 +235,37 @@ func (g *Game) DisplayBoardPretty() {
 
 func (g *Game) GeneratePseudoLegalMoves() []move.Move {
 	/*
-		Generating all pseudo-legal moves in parallel and then joining them from the channel to a list
+		Creating pseudo-legal moves in an iterative approach. This function is used in the actual implementation.
 	*/
 
+	pseudoLegalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
+
+	colorToMove := piece.ColorWhite
+
+	if !g.whiteToMove {
+		colorToMove = piece.ColorBlack
+	}
+
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GeneratePawnMoves(g.b, colorToMove, g.enPassantTargetSquare)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateStraightSlidingMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateDiagonalSlidingMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateKnightMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateKingMoves(g.b, colorToMove, g.castlingAvailability)...)
+
+	return pseudoLegalMoves
+}
+
+func (g *Game) GeneratePseudoLegalMovesParallel() []move.Move {
+	/*
+		Generating all pseudo-legal moves in parallel. Somehow, this is slower than generating them in a normal way.
+		I have not figured out why, so I am leaving this function in here. One possible reason might be the overhead the parallelization creates.
+	*/
 	pseudoLegalMovesChan := make(chan []move.Move)
+
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(5)
 
 	colorToMove := piece.ColorWhite
-
 	if !g.whiteToMove {
 		colorToMove = piece.ColorBlack
 	}
@@ -298,7 +320,7 @@ func (g *Game) GenerateLegalMoves() []move.Move {
 		Filtering out all illegal moves
 	*/
 
-	var legalMoves []move.Move
+	legalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
 
 	pseudoLegalMoves := g.GeneratePseudoLegalMoves()
 

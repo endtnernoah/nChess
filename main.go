@@ -3,32 +3,22 @@ package main
 import (
 	"endtner.dev/nChess/game"
 	"fmt"
+	"time"
 )
 
-var defaultFen string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-var testFen string = "8/8/8/4p1K1/2k1P3/8/8/8 b - - 0 1"
+var defaultFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+var perftPosition6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 "
 
 func main() {
-	g := game.New(defaultFen)
-	fmt.Println("Game is set up")
+	g := game.New(perftPosition6)
+
 	g.DisplayBoardPretty()
+	fmt.Println(g.ToFEN())
 
-	/*
-		b := g.Board()
-		fmt.Println("-------")
-		b.MakeMove(move.Move{8, 16, -1, -1, false})
-		b.MakeMove(move.Move{48, 32, -1, 40, false})
-		b.MakeMove(move.Move{1, 18, -1, -1, false})
-		g.DisplayBoardPretty()
-		fmt.Println("-------")
-		b.UnmakeMove()
-		g.DisplayBoardPretty()
-
-	*/
-
-	for i := range 10 {
-		fmt.Printf("Perft(%d) = %d\n", i, g.Perft(i))
+	startTotal := time.Now()
+	for _, m := range g.GenerateLegalMoves() {
+		g.MakeMove(m)
+		g.UnmakeMove()
 	}
-
-	//fmt.Println(len(possibleMoves))
+	fmt.Printf("Generating legal moves took %s\n", time.Since(startTotal))
 }
