@@ -216,10 +216,10 @@ func (b *Board) PieceAtIndex(index int) uint {
 
 func (b *Board) Update() {
 	b.updateBitboards()
-	b.updateWhiteAttackBitboard()
-	b.updateBlackAttackBitboard()
-	b.updateWhitePinnedPieces()
-	b.updateBlackPinnedPieces()
+	b.updateAttackBitboard(piece.ColorWhite)
+	b.updateAttackBitboard(piece.ColorBlack)
+	b.updatePinnedPiecesBitboard(piece.ColorWhite)
+	b.updatePinnedPiecesBitboard(piece.ColorBlack)
 }
 
 func (b *Board) updateBitboards() {
@@ -240,44 +240,23 @@ func (b *Board) updateBitboards() {
 	b.Pieces[2] = whitePieces | blackPieces
 }
 
-func (b *Board) updateWhiteAttackBitboard() {
-	whitePawnAttacks := b.pawnAttackBitboard(piece.ColorWhite)
-	whiteStraightSlidingAttacks := b.straightSlidingAttackBitboard(piece.ColorWhite)
-	whiteDiagonalSlidingAttacks := b.diagonalSlidingAttackBitboard(piece.ColorWhite)
-	whiteKnightAttacks := b.knightAttackBitboard(piece.ColorWhite)
+func (b *Board) updateAttackBitboard(color uint) {
+	pawnAttacks := b.pawnAttackBitboard(color)
+	straightSlidingAttacks := b.straightSlidingAttackBitboard(color)
+	diagonalSlidingAttacks := b.diagonalSlidingAttackBitboard(color)
+	knightAttacks := b.knightAttackBitboard(color)
 
-	b.AttackFields[0] = whitePawnAttacks |
-		whiteStraightSlidingAttacks |
-		whiteDiagonalSlidingAttacks |
-		whiteKnightAttacks
+	b.AttackFields[(color>>3)-1] = pawnAttacks |
+		straightSlidingAttacks |
+		diagonalSlidingAttacks |
+		knightAttacks
 }
 
-func (b *Board) updateBlackAttackBitboard() {
-	blackPawnAttacks := b.pawnAttackBitboard(piece.ColorBlack)
-	blackStraightSlidingAttacks := b.straightSlidingAttackBitboard(piece.ColorBlack)
-	blackDiagonalSlidingAttacks := b.diagonalSlidingAttackBitboard(piece.ColorBlack)
-	blackKnightAttacks := b.knightAttackBitboard(piece.ColorBlack)
+func (b *Board) updatePinnedPiecesBitboard(color uint) {
+	straightPinnedPieces := b.straightPinnedPiecesBitboard(color)
+	diagonalPinnedPieces := b.diagonalPinnedPiecesBitboard(color)
 
-	b.BlackPawnAttacks = blackPawnAttacks
-
-	b.AttackFields[1] = blackPawnAttacks |
-		blackStraightSlidingAttacks |
-		blackDiagonalSlidingAttacks |
-		blackKnightAttacks
-}
-
-func (b *Board) updateWhitePinnedPieces() {
-	straightPinnedPieces := b.straightPinnedPiecesBitboard(piece.ColorWhite)
-	diagonalPinnedPieces := b.diagonalPinnedPiecesBitboard(piece.ColorWhite)
-
-	b.PinnedPieces[0] = straightPinnedPieces | diagonalPinnedPieces
-}
-
-func (b *Board) updateBlackPinnedPieces() {
-	straightPinnedPieces := b.straightPinnedPiecesBitboard(piece.ColorBlack)
-	diagonalPinnedPieces := b.diagonalPinnedPiecesBitboard(piece.ColorBlack)
-
-	b.PinnedPieces[1] = straightPinnedPieces | diagonalPinnedPieces
+	b.PinnedPieces[(color>>3)-1] = straightPinnedPieces | diagonalPinnedPieces
 }
 
 func (b *Board) CalculateProtectMoves(colorToMove uint) (int, uint64) {
