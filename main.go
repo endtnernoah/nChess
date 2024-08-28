@@ -10,6 +10,8 @@ var testFen string = "8/8/8/4p1K1/2k1P3/8/8/8 b - - 0 1"
 
 func main() {
 	g := game.New(defaultFen)
+	fmt.Println("Game is set up")
+	g.DisplayBoardPretty()
 
 	/*
 		b := g.Board()
@@ -24,11 +26,9 @@ func main() {
 
 	*/
 
-	//possibleMoves := g.GenerateLegalMoves(2)
-
-	g.DisplayBoardPretty()
-
-	fmt.Printf("Perft(%d) = %d\n", 2, g.Perft(2))
+	for i := range 10 {
+		fmt.Printf("Perft(%d) = %d\n", i, g.Perft(i))
+	}
 
 	//fmt.Println(len(possibleMoves))
 }

@@ -5,12 +5,21 @@ import (
 	"endtner.dev/nChess/game/boardhelper"
 	"endtner.dev/nChess/game/formatter"
 	"endtner.dev/nChess/game/move"
+	"endtner.dev/nChess/game/movegenerator"
 	"endtner.dev/nChess/game/piece"
 	"fmt"
 	"math/bits"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+type State struct {
+	castlingAvailability  uint
+	enPassantTargetSquare int
+	halfMoves             int
+	moveCount             int
+}
 
 type Game struct {
 	b *board.Board
@@ -21,6 +30,8 @@ type Game struct {
 	enPassantTargetSquare int
 	halfMoves             int
 	moveCount             int
+
+	stateStack []State
 }
 
 func New(fenString string) *Game {
@@ -53,6 +64,8 @@ func New(fenString string) *Game {
 	// EP Target Square
 	if fenFields[3] != "-" {
 		g.enPassantTargetSquare = boardhelper.SquareToIndex(fenFields[3])
+	} else {
+		g.enPassantTargetSquare = -1
 	}
 
 	// Half move count
@@ -74,6 +87,138 @@ func New(fenString string) *Game {
 	return &g
 }
 
+func (g *Game) ToFEN() string {
+	var fen strings.Builder
+
+	fen.WriteString(g.Board().ToFEN())
+
+	// Active color
+	fen.WriteString(" ")
+	if g.whiteToMove {
+		fen.WriteString("w")
+	} else {
+		fen.WriteString("b")
+	}
+
+	// Castling availability
+	fen.WriteString(" ")
+	castlingRights := ""
+	if g.castlingAvailability&(1<<3) != 0 {
+		castlingRights += "K"
+	}
+	if g.castlingAvailability&(1<<2) != 0 {
+		castlingRights += "Q"
+	}
+	if g.castlingAvailability&(1<<1) != 0 {
+		castlingRights += "k"
+	}
+	if g.castlingAvailability&1 != 0 {
+		castlingRights += "q"
+	}
+	if castlingRights == "" {
+		fen.WriteString("-")
+	} else {
+		fen.WriteString(castlingRights)
+	}
+
+	// En passant target square
+	fen.WriteString(" ")
+	if g.enPassantTargetSquare == -1 {
+		fen.WriteString("-")
+	} else {
+		fen.WriteString(boardhelper.IndexToSquare(g.enPassantTargetSquare))
+	}
+
+	// Halfmove clock
+	fen.WriteString(" ")
+	fen.WriteString(strconv.Itoa(g.halfMoves))
+
+	// Fullmove number
+	fen.WriteString(" ")
+	fen.WriteString(strconv.Itoa(g.moveCount))
+
+	return fen.String()
+}
+
+func (g *Game) MakeMove(m move.Move) {
+	// Update the stack
+	g.stateStack = append(g.stateStack, State{g.castlingAvailability, g.enPassantTargetSquare, g.halfMoves, g.moveCount})
+
+	// Set new castling availability
+	kingSideRookStart := 7
+	queenSideRookStart := 0
+	kingStart := 4
+	kingSideBitIndex := 3
+	queenSideBitIndex := 2
+
+	if !g.whiteToMove {
+		kingSideRookStart += 56
+		queenSideRookStart += 56
+		kingStart += 56
+		kingSideBitIndex = 1
+		queenSideBitIndex = 0
+	}
+
+	if m.StartIndex == kingSideRookStart {
+		g.castlingAvailability = g.castlingAvailability & ^(1 << kingSideBitIndex)
+	}
+	if m.StartIndex == queenSideRookStart {
+		g.castlingAvailability = g.castlingAvailability & ^(1 << queenSideBitIndex)
+	}
+	if m.StartIndex == kingStart {
+		g.castlingAvailability = g.castlingAvailability & ^(1 << kingSideBitIndex)
+		g.castlingAvailability = g.castlingAvailability & ^(1 << queenSideBitIndex)
+	}
+
+	// Setting EP Target Square
+	if m.EnPassantPassedSquare != -1 {
+		g.enPassantTargetSquare = m.EnPassantPassedSquare
+	} else {
+		g.enPassantTargetSquare = -1
+	}
+
+	// Increase half move if not a pawn move and not a capture
+	movedPieceType := g.b.PieceAtIndex(m.StartIndex) & 0b00111
+	targetPiece := g.b.PieceAtIndex(m.TargetIndex)
+	if movedPieceType == piece.TypePawn || targetPiece != 0 {
+		g.halfMoves = 0
+	} else {
+		g.halfMoves += 1
+	}
+
+	// Increase the move number on blacks turns
+	if !g.whiteToMove {
+		g.moveCount += 1
+	}
+
+	// Make the move on board
+	g.Board().MakeMove(m)
+
+	// Switch around the color
+	g.OtherColorToMove()
+}
+
+func (g *Game) UnmakeMove() {
+
+	latestGameState := g.stateStack[len(g.stateStack)-1]
+
+	g.castlingAvailability = latestGameState.castlingAvailability
+	g.enPassantTargetSquare = latestGameState.enPassantTargetSquare
+	g.halfMoves = latestGameState.halfMoves
+	g.moveCount = latestGameState.moveCount
+
+	g.stateStack = g.stateStack[:len(g.stateStack)-1]
+
+	// Unmake move on board
+	g.Board().UnmakeMove()
+
+	g.OtherColorToMove()
+}
+
+func (g *Game) OtherColorToMove() { g.whiteToMove = !g.whiteToMove }
+
+func (g *Game) WhiteToMove() bool { return g.whiteToMove }
+
 func (g *Game) Board() *board.Board {
 	return g.b
 }
@@ -88,301 +233,169 @@ func (g *Game) DisplayBoardPretty() {
 	fmt.Println(formatter.FormatUnicodeBoardWithBorders(unicodeBoard))
 }
 
-func (g *Game) GenerateLegalMoves() []move.Move {
-	// Index offsets for each move
-	pawnIndexOffset := 8
-	straightIndexOffsets := []int{-1, 1, -8, 8}
-	diagonalIndexOffsets := []int{-7, 7, -9, 9}
-	knightIndexOffsets := []int{-6, 6, -10, 10, -15, 15, -17, 17}
+func (g *Game) GeneratePseudoLegalMoves() []move.Move {
+	/*
+		Generating all pseudo-legal moves in parallel and then joining them from the channel to a list
+	*/
+
+	pseudoLegalMovesChan := make(chan []move.Move)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(5)
 
 	colorToMove := piece.ColorWhite
-	ownOccupiedPieces := g.b.WhitePieces()
-	ownPinnedPieces := g.b.WhitePinnedPieces
-	enemyOccupiedPieces := g.b.BlackPieces()
-	enemyAttackFields := g.b.BlackAttackFields
-	promotionRank := 7
 
 	if !g.whiteToMove {
-		pawnIndexOffset = -8 // Changes based on walking direction
-
 		colorToMove = piece.ColorBlack
-		ownOccupiedPieces = g.b.BlackPieces()
-		ownPinnedPieces = g.b.BlackPinnedPieces
-		enemyOccupiedPieces = g.b.WhitePieces()
-		enemyAttackFields = g.b.WhiteAttackFields
-		promotionRank = 0
 	}
 
-	pawnBitboard := g.b.PieceBitboard(colorToMove | piece.TypePawn)
-	rookBitboard := g.b.PieceBitboard(colorToMove | piece.TypeRook)
-	knightBitboard := g.b.PieceBitboard(colorToMove | piece.TypeKnight)
-	bishopBitboard := g.b.PieceBitboard(colorToMove | piece.TypeBishop)
-	queenBitboard := g.b.PieceBitboard(colorToMove | piece.TypeQueen)
-	kingBitboard := g.b.PieceBitboard(colorToMove | piece.TypeKing)
+	// Pawn moves
+	go func(b *board.Board, colorToMove uint, enPassantTargetSquare int) {
+		defer waitGroup.Done()
+		pseudoLegalMovesChan <- movegenerator.GeneratePawnMoves(b, colorToMove, enPassantTargetSquare)
+	}(g.b, colorToMove, g.enPassantTargetSquare)
 
-	// Starting move generation
-	legalMoves := make([]move.Move, 0)
+	// Straight sliding moves
+	go func(b *board.Board, colorToMove uint) {
+		defer waitGroup.Done()
+		pseudoLegalMovesChan <- movegenerator.GenerateStraightSlidingMoves(b, colorToMove)
+	}(g.b, colorToMove)
 
-	// Generate pawn moves
-	for pawnBitboard != 0 {
-		// Get index of LSB
-		startIndex := bits.TrailingZeros64(pawnBitboard)
-		targetIndex := startIndex + pawnIndexOffset
+	// Diagonal sliding moves
+	go func(b *board.Board, colorToMove uint) {
+		defer waitGroup.Done()
+		pseudoLegalMovesChan <- movegenerator.GenerateDiagonalSlidingMoves(b, colorToMove)
+	}(g.b, colorToMove)
 
-		// Continue if piece is pinned
-		if boardhelper.IsIndexBitSet(startIndex, ownPinnedPieces) {
-			pawnBitboard &= pawnBitboard - 1
-			continue
-		}
+	// Knight moves
+	go func(b *board.Board, colorToMove uint) {
+		defer waitGroup.Done()
+		pseudoLegalMovesChan <- movegenerator.GenerateKnightMoves(b, colorToMove)
+	}(g.b, colorToMove)
 
-		// Continue if target index is out of bounds, just go to the next iteration
-		if targetIndex < 0 || targetIndex > 63 {
-			pawnBitboard &= pawnBitboard - 1
-			continue
-		}
+	// King moves
+	go func(b *board.Board, colorToMove uint, castlingAvailability uint) {
+		defer waitGroup.Done()
+		pseudoLegalMovesChan <- movegenerator.GenerateKingMoves(b, colorToMove, castlingAvailability)
+	}(g.b, colorToMove, g.castlingAvailability)
 
-		// Add move if target square is empty
-		if !boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces|enemyOccupiedPieces) {
-			legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, targetIndex/8 == promotionRank))
-		}
+	// Wait for all generators to finish
+	go func() {
+		waitGroup.Wait()
+		close(pseudoLegalMovesChan)
+	}()
 
-		// Check if the pawn is on starting square
-		isStartingSquare := startIndex >= 8 && startIndex < 16
-		if !g.whiteToMove {
-			isStartingSquare = startIndex >= 48 && startIndex < 56
-		}
-
-		// Can move 2 rows from starting square
-		if isStartingSquare {
-			if !boardhelper.IsIndexBitSet(targetIndex+pawnIndexOffset, ownOccupiedPieces|enemyOccupiedPieces) {
-				legalMoves = append(legalMoves, move.New(startIndex, targetIndex+pawnIndexOffset, -1, targetIndex, -1, false))
-			}
-		}
-
-		// Check for possible captures
-		side1 := targetIndex - 1
-		side2 := targetIndex + 1
-
-		// Add move if it is in the same target row and targets are not empty
-		if side1/8 == targetIndex/8 && boardhelper.IsIndexBitSet(side1, enemyOccupiedPieces) {
-			legalMoves = append(legalMoves, move.New(startIndex, side1, -1, -1, -1, targetIndex/8 == promotionRank))
-		}
-		if side2/8 == targetIndex/8 && boardhelper.IsIndexBitSet(side2, enemyOccupiedPieces) {
-			legalMoves = append(legalMoves, move.New(startIndex, side2, -1, -1, -1, targetIndex/8 == promotionRank))
-		}
-
-		// Add move if either side can capture en passant
-		if side1 == g.enPassantTargetSquare && (side1/8 == g.enPassantTargetSquare/8) {
-			legalMoves = append(legalMoves, move.New(startIndex, side1, side1-pawnIndexOffset, -1, -1, false))
-		}
-		if side2 == g.enPassantTargetSquare && (side2/8 == g.enPassantTargetSquare/8) {
-			legalMoves = append(legalMoves, move.New(startIndex, side2, side2-pawnIndexOffset, -1, -1, false))
-		}
-
-		// Remove LSB of bitboard
-		pawnBitboard &= pawnBitboard - 1
+	// Joining to a list, returning
+	var pseudoLegalMoves []move.Move
+	for m := range pseudoLegalMovesChan {
+		pseudoLegalMoves = append(pseudoLegalMoves, m...)
 	}
 
-	// Generate rook moves
-	for rookBitboard != 0 {
-		startIndex := bits.TrailingZeros64(rookBitboard)
+	return pseudoLegalMoves
+}
 
-		if boardhelper.IsIndexBitSet(startIndex, ownPinnedPieces) {
-			rookBitboard &= rookBitboard - 1
+func (g *Game) GenerateLegalMoves() []move.Move {
+	/*
+		Filtering out all illegal moves
+	*/
+
+	var legalMoves []move.Move
+
+	pseudoLegalMoves := g.GeneratePseudoLegalMoves()
+
+	colorToMove := piece.ColorWhite
+
+	if !g.whiteToMove {
+		colorToMove = piece.ColorBlack
+	}
+
+	ownKingBitboard := g.b.PieceBitboard(colorToMove | piece.TypeKing)
+	ownPinnedPieces := g.b.PinnedPieces[(colorToMove>>3)-1]
+
+	ownKingIndex := bits.TrailingZeros64(ownKingBitboard)
+
+	enemyAttackFields := g.b.AttackFields[1-((colorToMove>>3)-1)]
+
+	checkCount := 0
+	possibleProtectMoves := ^uint64(0)
+
+	if boardhelper.IsIndexBitSet(ownKingIndex, enemyAttackFields) {
+		checkCount, possibleProtectMoves = g.b.CalculateProtectMoves(colorToMove)
+	}
+
+	for _, m := range pseudoLegalMoves {
+
+		// Only move along pin ray if piece is pinned
+		if boardhelper.IsIndexBitSet(m.StartIndex, ownPinnedPieces) && !g.b.IsPinnedMoveAlongRay(colorToMove, m) {
 			continue
 		}
 
-		// Go as deep as possible
-		for _, offset := range straightIndexOffsets {
-			targetIndex := startIndex + offset
+		// If the king is in check
+		if checkCount > 0 {
 
-			// Go deep into direction
-			for boardhelper.IsValidStraightMove(startIndex, targetIndex) && !boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
+			// King is in single check
+			if checkCount == 1 {
 
-				// Break on possible capture for direction
-				if boardhelper.IsIndexBitSet(targetIndex, enemyOccupiedPieces) {
-					legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-					break
+				// If a move is not to any of the proctect square OR not a king move
+				if !boardhelper.IsIndexBitSet(m.TargetIndex, possibleProtectMoves) && (ownKingIndex != m.StartIndex) {
+
+					// Move can not enPassantCapture the checking pawn, not allowed
+					if m.EnPassantCaptureSquare == -1 {
+						continue
+					}
+
+					// Move CAN capture enPassant, but not the attacking pawn, not allowed
+					if m.EnPassantCaptureSquare != -1 && !boardhelper.IsIndexBitSet(m.EnPassantCaptureSquare, possibleProtectMoves) {
+						continue
+					}
 				}
-
-				legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-				targetIndex += offset
 			}
 
+			// If the king is in double (or higher) check, only allow king moves
+			if checkCount > 1 && ownKingIndex != m.StartIndex {
+				continue
+			}
 		}
 
-		// Remove LSB
-		rookBitboard &= rookBitboard - 1
-	}
-
-	for knightBitboard != 0 {
-		// Get index of LSB
-		startIndex := bits.TrailingZeros64(knightBitboard)
-
-		if boardhelper.IsIndexBitSet(startIndex, ownPinnedPieces) {
-			knightBitboard &= knightBitboard - 1
+		// If we do an enPassant Capture, make sure it does not leave our own king in check
+		if m.EnPassantCaptureSquare != -1 && g.b.IsEnPassantMovePinned(colorToMove, m) {
 			continue
 		}
 
-		for _, offset := range knightIndexOffsets {
-			targetIndex := startIndex + offset
-
-			if !boardhelper.IsValidKnightMove(startIndex, targetIndex) || boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				continue
-			}
-
-			legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-		}
-
-		knightBitboard &= knightBitboard - 1
-	}
-
-	// Generate bishop moves
-	for bishopBitboard != 0 {
-		startIndex := bits.TrailingZeros64(bishopBitboard)
-
-		if boardhelper.IsIndexBitSet(startIndex, ownPinnedPieces) {
-			bishopBitboard &= bishopBitboard - 1
-		}
-
-		// Go as deep as possible
-		for _, offset := range diagonalIndexOffsets {
-			targetIndex := startIndex + offset
-
-			for boardhelper.IsValidDiagonalMove(startIndex, targetIndex) && !boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				if boardhelper.IsIndexBitSet(targetIndex, enemyOccupiedPieces) {
-					legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-					break
-				}
-
-				legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-				targetIndex += offset
-			}
-
-		}
-
-		bishopBitboard &= bishopBitboard - 1
-	}
-
-	for queenBitboard != 0 {
-		// Get index of LSB
-		startIndex := bits.TrailingZeros64(queenBitboard)
-
-		if boardhelper.IsIndexBitSet(startIndex, ownPinnedPieces) {
-			queenBitboard &= queenBitboard - 1
-			continue
-		}
-
-		// Go as deep as possible
-		for _, offset := range straightIndexOffsets {
-			targetIndex := startIndex + offset
-
-			for boardhelper.IsValidStraightMove(startIndex, targetIndex) && !boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				if boardhelper.IsIndexBitSet(targetIndex, enemyOccupiedPieces) {
-					legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-					break
-				}
-
-				legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-				targetIndex += offset
-			}
-
-		}
-
-		for _, offset := range diagonalIndexOffsets {
-			targetIndex := startIndex + offset
-
-			for boardhelper.IsValidDiagonalMove(startIndex, targetIndex) && !boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				if boardhelper.IsIndexBitSet(targetIndex, enemyOccupiedPieces) {
-					legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-					break
-				}
-
-				legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-				targetIndex += offset
-			}
-
-		}
-
-		queenBitboard &= queenBitboard - 1
-	}
-
-	for kingBitboard != 0 {
-		// Get index of LSB
-		startIndex := bits.TrailingZeros64(kingBitboard)
-
-		for _, offset := range straightIndexOffsets {
-			targetIndex := startIndex + offset
-
-			if !boardhelper.IsValidStraightMove(startIndex, targetIndex) || boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				continue
-			}
-
-			if boardhelper.IsIndexBitSet(targetIndex, enemyAttackFields) {
-				continue
-			}
-
-			legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-		}
-
-		for _, offset := range diagonalIndexOffsets {
-			targetIndex := startIndex + offset
-
-			if !boardhelper.IsValidDiagonalMove(startIndex, targetIndex) || boardhelper.IsIndexBitSet(targetIndex, ownOccupiedPieces) {
-				continue
-			}
-
-			// Cannot move king into attack field
-			if boardhelper.IsIndexBitSet(targetIndex, enemyAttackFields) {
-				continue
-			}
-
-			legalMoves = append(legalMoves, move.New(startIndex, targetIndex, -1, -1, -1, false))
-		}
-
-		// Castling
-		kingSideAllowed := g.castlingAvailability&0b1000 != 0
-		queenSideAllowed := g.castlingAvailability&0b0100 != 0
-
-		var emptyFieldsKingSide uint64 = 0b0000011
-		var emptyFieldsQueenSide uint64 = 0b1110
-
-		kingSideRook := 7
-		queenSideRook := 0
-
-		if !g.whiteToMove {
-			kingSideAllowed = g.castlingAvailability&0b0010 != 0
-			queenSideAllowed = g.castlingAvailability&0b0001 != 0
-
-			emptyFieldsKingSide = emptyFieldsKingSide << 56
-			emptyFieldsQueenSide = emptyFieldsQueenSide << 56
-
-			kingSideRook = 63
-			queenSideRook = 56
-		}
-
-		// White king to g1, rook to f1; black king to g8, rook to f8
-		if kingSideAllowed && !boardhelper.IsIndexBitSet(startIndex, enemyAttackFields) {
-			if (emptyFieldsKingSide&g.b.Occupied() == 0) &&
-				!boardhelper.IsIndexBitSet(startIndex+1, enemyAttackFields) &&
-				!boardhelper.IsIndexBitSet(startIndex+2, enemyAttackFields) {
-
-				legalMoves = append(legalMoves, move.New(startIndex, startIndex+2, -1, -1, kingSideRook, false))
-			}
-		}
-
-		// White king to c1, rook to d1; black king to c8, rook to d8
-		if queenSideAllowed && !boardhelper.IsIndexBitSet(startIndex, enemyAttackFields) {
-			if (emptyFieldsQueenSide&g.b.Occupied() == 0) &&
-				!boardhelper.IsIndexBitSet(startIndex-1, enemyAttackFields) &&
-				!boardhelper.IsIndexBitSet(startIndex-2, enemyAttackFields) {
-
-				legalMoves = append(legalMoves, move.New(startIndex, startIndex-2, -1, -1, queenSideRook, false))
-			}
-		}
-
-		kingBitboard &= kingBitboard - 1
+		legalMoves = append(legalMoves, m)
 	}
 
 	return legalMoves
+}
+
+func (g *Game) Perft(ply int) int64 {
+	/*
+		Perft Testing Utility
+	*/
+
+	if ply == 0 {
+		return 1
+	}
+
+	legalMoves := g.GenerateLegalMoves()
+	var totalNodes int64 = 0
+
+	// Not the official implementation, but works a lot faster
+	if ply == 1 {
+		return int64(len(legalMoves))
+	}
+
+	for _, m := range legalMoves {
+		g.MakeMove(m)
+
+		subNodes := g.Perft(ply - 1)
+		totalNodes += subNodes
+
+		if ply == 10 {
+			fmt.Printf("%s: %d\n", move.PrintSimple(m), subNodes)
+		}
+
+		g.UnmakeMove()
+	}
+
+	return totalNodes
 }

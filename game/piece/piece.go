@@ -41,3 +41,31 @@ func Value(pieceChar rune) uint {
 		return 0
 	}
 }
+
+func ToString(pieceValue uint) string {
+	pieceType := pieceValue & 0b00111
+	color := pieceValue & 0b11000
+
+	var char rune
+	switch pieceType {
+	case TypePawn:
+		char = 'p'
+	case TypeRook:
+		char = 'r'
+	case TypeKnight:
+		char = 'n'
+	case TypeBishop:
+		char = 'b'
+	case TypeQueen:
+		char = 'q'
+	case TypeKing:
+		char = 'k'
+	default:
+		return ""
+	}
+
+	if color == ColorWhite {
+		return string(char - 32) // Convert to uppercase
+	}
+	return string(char)
+}

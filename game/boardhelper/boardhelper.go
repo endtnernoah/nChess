@@ -1,6 +1,8 @@
 package boardhelper
 
-import "unicode"
+import (
+	"unicode"
+)
 
 func IsIndexBitSet(bitIndex int, bitboard uint64) bool {
 	return (bitboard & (1 << bitIndex)) != 0
@@ -108,4 +110,42 @@ func IsValidKnightMove(sourceIndex, targetIndex int) bool {
 	// 1. It moves 2 squares in one direction and 1 square in the perpendicular direction
 	// 2. The total of rank difference and file difference is 3
 	return (rankDiff == 2 && fileDiff == 1) || (rankDiff == 1 && fileDiff == 2)
+}
+
+func CalculateRayOffset(fromIndex, toIndex int) int {
+	diff := toIndex - fromIndex
+
+	// Handle diagonal pins
+	if diff%7 == 0 {
+		if diff > 0 {
+			return 7 // Pinned piece is on the bottom-left to top-right diagonal
+		}
+		return -7 // Pinned piece is on the top-left to bottom-right diagonal
+	}
+
+	if diff%9 == 0 {
+		if diff > 0 {
+			return 9 // Pinned piece is on the top-left to bottom-right diagonal
+		}
+		return -9 // Pinned piece is on the bottom-left to top-right diagonal
+	}
+
+	// Handle horizontal pins
+	if diff%8 == 0 {
+		if diff > 0 {
+			return 8 // Pinned piece is below the king
+		}
+		return -8 // Pinned piece is above the king
+	}
+
+	// Handle vertical pins
+	if diff > -8 && diff < 8 {
+		if diff > 0 {
+			return 1 // Pinned piece is to the right of the king
+		}
+		return -1 // Pinned piece is to the left of the king
+	}
+
+	// If we get here, the pieces aren't on a straight line
+	return 0
 }

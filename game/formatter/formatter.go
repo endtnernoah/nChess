@@ -57,7 +57,9 @@ func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
 }
 
 func FormatUnicodeBoard(board []string) string {
-	// Hate that function
+	/*
+		Please just do not use this function anywhere
+	*/
 	var result strings.Builder
 
 	for i := 63; i >= 0; i -= 8 {
@@ -71,7 +73,9 @@ func FormatUnicodeBoard(board []string) string {
 }
 
 func FormatUnicodeBoardWithBorders(board []string) string {
-	// Hate that function too
+	/*
+		claude.ai is responsible for this satanic child of a function, but it does work like a charm
+	*/
 	var result strings.Builder
 
 	// Unicode box-drawing characters

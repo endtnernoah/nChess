@@ -2,6 +2,7 @@ package move
 
 import (
 	"endtner.dev/nChess/game/boardhelper"
+	"endtner.dev/nChess/game/piece"
 	"fmt"
 )
 
@@ -11,20 +12,56 @@ type Move struct {
 	EnPassantCaptureSquare int
 	EnPassantPassedSquare  int
 	RookStartingSquare     int
-	IsPromotion            bool
+	PromotionPiece         uint
 }
 
-func New(startIndex int, targetIndex int, enPassantCaptureSquare int, enPassantPassedSquare int, rookStartingSquare int, isPromotion bool) Move {
-	return Move{
-		StartIndex:             startIndex,
-		TargetIndex:            targetIndex,
-		EnPassantCaptureSquare: enPassantCaptureSquare,
-		EnPassantPassedSquare:  enPassantPassedSquare,
-		RookStartingSquare:     rookStartingSquare,
-		IsPromotion:            isPromotion,
+type OptionalParameter func(*Move)
+
+func WithEnPassantCaptureSquare(square int) OptionalParameter {
+	return func(m *Move) {
+		m.EnPassantCaptureSquare = square
 	}
 }
 
-func Print(m Move) {
-	fmt.Printf("Move(from: %s, to: %s)\n", boardhelper.IndexToSquare(m.StartIndex), boardhelper.IndexToSquare(m.TargetIndex))
+func WithEnPassantPassedSquare(square int) OptionalParameter {
+	return func(m *Move) {
+		m.EnPassantPassedSquare = square
+	}
+}
+
+func WithRookStartingSquare(square int) OptionalParameter {
+	return func(m *Move) {
+		m.RookStartingSquare = square
+	}
+}
+
+func WithPromotion(promotionPiece uint) OptionalParameter {
+	return func(m *Move) {
+		m.PromotionPiece = promotionPiece
+	}
+}
+
+func New(startIndex int, targetIndex int, optionalParameters ...OptionalParameter) Move {
+	m := Move{
+		StartIndex:             startIndex,
+		TargetIndex:            targetIndex,
+		EnPassantCaptureSquare: -1,
+		EnPassantPassedSquare:  -1,
+		RookStartingSquare:     -1,
+		PromotionPiece:         0,
+	}
+
+	for _, optionalParameter := range optionalParameters {
+		optionalParameter(&m)
+	}
+
+	return m
+}
+
+func Print(m Move) string {
+	return fmt.Sprintf("Move(from: %s, to: %s)\n", boardhelper.IndexToSquare(m.StartIndex), boardhelper.IndexToSquare(m.TargetIndex))
+}
+
+func PrintSimple(m Move) string {
+	return fmt.Sprintf("%s%s%s", boardhelper.IndexToSquare(m.StartIndex), boardhelper.IndexToSquare(m.TargetIndex), piece.ToString(m.PromotionPiece))
 }
