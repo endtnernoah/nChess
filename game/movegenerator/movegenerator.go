@@ -20,17 +20,6 @@ var KnightOffsets = []int{-6, 6, -10, 10, -15, 15, -17, 17}
 
 var DistanceToEdge = computeDistanceToEdges()
 
-// ComputedAttacks & ComputedPins can be accessed at index (3 >> color) - 1 & 1 - accessIndex for enemy color
-var ComputedAttacks = make([]uint64, 2)
-var ComputedPins = make([]uint64, 2)
-
-func Min(x int, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 func computeDistanceToEdges() [][]int {
 	precomputedDistances := make([][]int, 64)
 
@@ -57,6 +46,17 @@ func computeDistanceToEdges() [][]int {
 	}
 
 	return precomputedDistances
+}
+
+// ComputedAttacks & ComputedPins can be accessed at index (3 >> color) - 1 & 1 - accessIndex for enemy color
+var ComputedAttacks = make([]uint64, 2)
+var ComputedPins = make([]uint64, 2)
+
+func Min(x int, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
 
 func ComputeAll(b *board.Board) {
@@ -168,6 +168,55 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 	return pawnMoves
 }
 
+func SlidingMoves(b *board.Board, pieceColor uint) []move.Move {
+	var slidingMoves []move.Move
+
+	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
+	enemyOccupiedFields := b.OccupancyBitboards[1-((pieceColor>>3)-1)]
+
+	piecesBitboard := b.Bitboards[pieceColor|piece.TypeRook] | b.Bitboards[pieceColor|piece.TypeBishop] | b.Bitboards[pieceColor|piece.TypeQueen]
+	for piecesBitboard != 0 {
+		startIndex := bits.TrailingZeros64(piecesBitboard)
+		pieceType := b.Pieces[startIndex] & 0b00111
+
+		offsetIndexStart := 0
+		offsetIndexEnd := 8
+
+		// Manipulating indices based on piece type
+		if pieceType == piece.TypeRook {
+			offsetIndexEnd = 4
+		}
+		if pieceType == piece.TypeBishop {
+			offsetIndexStart = 4
+		}
+
+		for i, offset := range DirectionalOffsets[offsetIndexStart:offsetIndexEnd] {
+			targetIndex := startIndex + offset
+
+			depth := 1
+			for depth <= DistanceToEdge[startIndex][i+offsetIndexStart] {
+				if boardhelper.IsIndexBitSet(targetIndex, ownOccupiedFields) {
+					break
+				}
+
+				slidingMoves = append(slidingMoves, move.New(startIndex, targetIndex))
+
+				// Break if we captured an enemy
+				if boardhelper.IsIndexBitSet(targetIndex, enemyOccupiedFields) {
+					break
+				}
+
+				targetIndex += offset
+				depth++
+			}
+		}
+
+		piecesBitboard &= piecesBitboard - 1
+	}
+
+	return slidingMoves
+}
+
 func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	var straightSlidingMoves []move.Move
 
@@ -178,7 +227,6 @@ func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 
-		// Go as deep as possible
 		for i, offset := range DirectionalOffsets[:4] {
 			targetIndex := startIndex + offset
 
@@ -201,7 +249,6 @@ func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 			}
 		}
 
-		// Remove LSB
 		piecesBitboard &= piecesBitboard - 1
 	}
 
@@ -417,7 +464,7 @@ func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
 
 		maxLength := 8
-		if (b.PieceAtIndex(startIndex) & 0b00111) == piece.TypeKing {
+		if (b.Pieces[startIndex] & 0b00111) == piece.TypeKing {
 			maxLength = 1
 		}
 
@@ -470,7 +517,7 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
 
 		maxLength := 8
-		if (b.PieceAtIndex(startIndex) & 0b00111) == piece.TypeKing {
+		if (b.Pieces[startIndex] & 0b00111) == piece.TypeKing {
 			maxLength = 1
 		}
 

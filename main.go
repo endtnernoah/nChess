@@ -14,7 +14,7 @@ func main() {
 	g.DisplayBoardPretty()
 	fmt.Println(g.ToFEN())
 
+	ply := 6
 	startTotal := time.Now()
-	g.Perft(6)
-	fmt.Printf("Perft(6) took %s\n", time.Since(startTotal))
+	fmt.Printf("Perft(%d)=%d, took %s\n", ply, g.Perft(ply), time.Since(startTotal))
 }

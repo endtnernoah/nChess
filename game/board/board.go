@@ -207,23 +207,6 @@ func (b *Board) UnmakeMove() {
 	b.stateStack = b.stateStack[:n-1]
 }
 
-func (b *Board) PieceAtIndex(index int) uint {
-	if index < 0 || index > 63 {
-		return 0 // Invalid index
-	}
-
-	for pieceType := uint(0); pieceType < 7; pieceType++ {
-		if boardhelper.IsIndexBitSet(index, b.Bitboards[pieceType|piece.ColorWhite]) {
-			return pieceType | piece.ColorWhite
-		}
-		if boardhelper.IsIndexBitSet(index, b.Bitboards[pieceType|piece.ColorBlack]) {
-			return pieceType | piece.ColorBlack
-		}
-	}
-
-	return 0 // No piece found
-}
-
 func (b *Board) ComputeOccupancyBitboards() {
 	var whitePieces uint64
 	var blackPieces uint64

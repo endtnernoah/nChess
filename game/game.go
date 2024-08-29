@@ -181,8 +181,8 @@ func (g *Game) MakeMove(m move.Move) {
 	}
 
 	// Increase half move if not a pawn move and not a capture
-	movedPieceType := g.b.PieceAtIndex(m.StartIndex) & 0b00111
-	targetPiece := g.b.PieceAtIndex(m.TargetIndex)
+	movedPieceType := g.b.Pieces[m.StartIndex] & 0b00111
+	targetPiece := g.b.Pieces[m.TargetIndex]
 	if movedPieceType == piece.TypePawn || targetPiece != 0 {
 		g.halfMoves = 0
 	} else {
@@ -252,8 +252,9 @@ func (g *Game) PseudoLegalMoves() []move.Move {
 	}
 
 	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.PawnMoves(g.b, colorToMove, g.enPassantTargetSquare)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.StraightSlidingMoves(g.b, colorToMove)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.DiagonalSlidingMoves(g.b, colorToMove)...)
+	//pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.StraightSlidingMoves(g.b, colorToMove)...)
+	//pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.DiagonalSlidingMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.SlidingMoves(g.b, colorToMove)...)
 	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.KnightMoves(g.b, colorToMove)...)
 	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.KingMoves(g.b, colorToMove, g.castlingAvailability)...)
 
@@ -418,10 +419,6 @@ func (g *Game) Perft(ply int) int64 {
 
 		subNodes := g.Perft(ply - 1)
 		totalNodes += subNodes
-
-		if ply == 10 {
-			fmt.Printf("%s: %d\n", move.PrintSimple(m), subNodes)
-		}
 
 		g.UnmakeMove()
 	}
