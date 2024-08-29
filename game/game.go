@@ -32,6 +32,7 @@ type Game struct {
 	moveCount             int
 
 	stateStack []State
+	moveStack  []string
 }
 
 func New(fenString string) *Game {
@@ -83,6 +84,9 @@ func New(fenString string) *Game {
 		panic(err)
 	}
 	g.moveCount = data
+
+	// Precomputing
+	movegenerator.ComputeAll(g.b, "SETUP")
 
 	return &g
 }
@@ -143,6 +147,7 @@ func (g *Game) ToFEN() string {
 func (g *Game) MakeMove(m move.Move) {
 	// Update the stack
 	g.stateStack = append(g.stateStack, State{g.castlingAvailability, g.enPassantTargetSquare, g.halfMoves, g.moveCount})
+	g.moveStack = append(g.moveStack, move.PrintSimple(m))
 
 	// Set new castling availability
 	kingSideRookStart := 7
@@ -194,6 +199,25 @@ func (g *Game) MakeMove(m move.Move) {
 	// Make the move on board
 	g.Board().MakeMove(m)
 
+	// Precompute pins, attacks and shared bitboards
+	g.b.ComputeBitboards()
+
+	kingBitboard1 := g.b.PieceBitboard(piece.ColorWhite | piece.TypeKing)
+	if kingBitboard1 == 0 {
+		fmt.Println(g.moveStack)
+		g.DisplayBoardPretty()
+		fmt.Println(g.ToFEN())
+		fmt.Println(formatter.FormatUnicodeBoardWithBorders(formatter.ToUnicodeBoard(map[uint64]string{movegenerator.ComputedPins[0]: "X"})))
+	}
+	kingBitboard2 := g.b.PieceBitboard(piece.ColorBlack | piece.TypeKing)
+	if kingBitboard2 == 0 {
+		fmt.Println(g.moveStack)
+		g.DisplayBoardPretty()
+		fmt.Println(g.ToFEN())
+		fmt.Println(formatter.FormatUnicodeBoardWithBorders(formatter.ToUnicodeBoard(map[uint64]string{movegenerator.ComputedPins[1]: "X"})))
+	}
+	movegenerator.ComputeAll(g.b, "DO")
+
 	// Switch around the color
 	g.OtherColorToMove()
 }
@@ -208,11 +232,16 @@ func (g *Game) UnmakeMove() {
 	g.moveCount = latestGameState.moveCount
 
 	g.stateStack = g.stateStack[:len(g.stateStack)-1]
+	g.moveStack = g.moveStack[:len(g.moveStack)-1]
 
 	// Unmake move on board
 	g.Board().UnmakeMove()
 
 	g.OtherColorToMove()
+
+	// Precompute pins, attacks and shared bitboards
+	g.b.ComputeBitboards()
+	movegenerator.ComputeAll(g.b, "UNDO")
 }
 
 func (g *Game) OtherColorToMove() { g.whiteToMove = !g.whiteToMove }
@@ -246,11 +275,11 @@ func (g *Game) GeneratePseudoLegalMoves() []move.Move {
 		colorToMove = piece.ColorBlack
 	}
 
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GeneratePawnMoves(g.b, colorToMove, g.enPassantTargetSquare)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateStraightSlidingMoves(g.b, colorToMove)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateDiagonalSlidingMoves(g.b, colorToMove)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateKnightMoves(g.b, colorToMove)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.GenerateKingMoves(g.b, colorToMove, g.castlingAvailability)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.PawnMoves(g.b, colorToMove, g.enPassantTargetSquare)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.StraightSlidingMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.DiagonalSlidingMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.KnightMoves(g.b, colorToMove)...)
+	pseudoLegalMoves = append(pseudoLegalMoves, movegenerator.KingMoves(g.b, colorToMove, g.castlingAvailability)...)
 
 	return pseudoLegalMoves
 }
@@ -273,31 +302,31 @@ func (g *Game) GeneratePseudoLegalMovesParallel() []move.Move {
 	// Pawn moves
 	go func(b *board.Board, colorToMove uint, enPassantTargetSquare int) {
 		defer waitGroup.Done()
-		pseudoLegalMovesChan <- movegenerator.GeneratePawnMoves(b, colorToMove, enPassantTargetSquare)
+		pseudoLegalMovesChan <- movegenerator.PawnMoves(b, colorToMove, enPassantTargetSquare)
 	}(g.b, colorToMove, g.enPassantTargetSquare)
 
 	// Straight sliding moves
 	go func(b *board.Board, colorToMove uint) {
 		defer waitGroup.Done()
-		pseudoLegalMovesChan <- movegenerator.GenerateStraightSlidingMoves(b, colorToMove)
+		pseudoLegalMovesChan <- movegenerator.StraightSlidingMoves(b, colorToMove)
 	}(g.b, colorToMove)
 
 	// Diagonal sliding moves
 	go func(b *board.Board, colorToMove uint) {
 		defer waitGroup.Done()
-		pseudoLegalMovesChan <- movegenerator.GenerateDiagonalSlidingMoves(b, colorToMove)
+		pseudoLegalMovesChan <- movegenerator.DiagonalSlidingMoves(b, colorToMove)
 	}(g.b, colorToMove)
 
 	// Knight moves
 	go func(b *board.Board, colorToMove uint) {
 		defer waitGroup.Done()
-		pseudoLegalMovesChan <- movegenerator.GenerateKnightMoves(b, colorToMove)
+		pseudoLegalMovesChan <- movegenerator.KnightMoves(b, colorToMove)
 	}(g.b, colorToMove)
 
 	// King moves
 	go func(b *board.Board, colorToMove uint, castlingAvailability uint) {
 		defer waitGroup.Done()
-		pseudoLegalMovesChan <- movegenerator.GenerateKingMoves(b, colorToMove, castlingAvailability)
+		pseudoLegalMovesChan <- movegenerator.KingMoves(b, colorToMove, castlingAvailability)
 	}(g.b, colorToMove, g.castlingAvailability)
 
 	// Wait for all generators to finish
@@ -331,18 +360,20 @@ func (g *Game) GenerateLegalMoves() []move.Move {
 	}
 
 	ownKingBitboard := g.b.PieceBitboard(colorToMove | piece.TypeKing)
-	ownPinnedPieces := g.b.PinnedPieces[(colorToMove>>3)-1]
+	ownPinnedPieces := movegenerator.ComputedPins[(colorToMove>>3)-1]
 
 	ownKingIndex := bits.TrailingZeros64(ownKingBitboard)
 
-	enemyAttackFields := g.b.AttackFields[1-((colorToMove>>3)-1)]
+	enemyAttackFields := movegenerator.ComputedAttacks[1-((colorToMove>>3)-1)]
 
 	checkCount := 0
 	possibleProtectMoves := ^uint64(0)
 
 	if boardhelper.IsIndexBitSet(ownKingIndex, enemyAttackFields) {
-		checkCount, possibleProtectMoves = g.b.CalculateProtectMoves(colorToMove)
+		checkCount, possibleProtectMoves = movegenerator.CheckMask(g.b, colorToMove)
 	}
+
+	//fmt.Println(formatter.FormatUnicodeBoardWithBorders(formatter.ToUnicodeBoard(map[uint64]string{enemyAttackFields: "A"})))
 
 	for _, m := range pseudoLegalMoves {
 
