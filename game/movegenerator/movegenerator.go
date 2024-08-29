@@ -83,8 +83,8 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 		promotionRank = 0
 	}
 
-	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
-	occupiedFields := b.Pieces[2]
+	enemyOccupiedFields := b.OccupancyBitboards[1-((pieceColor>>3)-1)]
+	occupiedFields := b.OccupancyBitboards[2]
 
 	pawnBitboard := b.Bitboards[pieceColor|piece.TypePawn]
 	for pawnBitboard != 0 {
@@ -171,8 +171,8 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	var straightSlidingMoves []move.Move
 
-	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
-	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
+	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
+	enemyOccupiedFields := b.OccupancyBitboards[1-((pieceColor>>3)-1)]
 
 	piecesBitboard := b.Bitboards[pieceColor|piece.TypeRook] | b.Bitboards[pieceColor|piece.TypeQueen]
 	for piecesBitboard != 0 {
@@ -211,8 +211,8 @@ func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	var diagonalSlidingMoves []move.Move
 
-	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
-	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
+	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
+	enemyOccupiedFields := b.OccupancyBitboards[1-((pieceColor>>3)-1)]
 
 	piecesBitboard := b.Bitboards[pieceColor|piece.TypeBishop] | b.Bitboards[pieceColor|piece.TypeQueen]
 	for piecesBitboard != 0 {
@@ -251,7 +251,7 @@ func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
 	var knightMoves []move.Move
 
-	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
+	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
 
 	piecesBitboard := b.Bitboards[pieceColor|piece.TypeKnight]
 	for piecesBitboard != 0 {
@@ -282,8 +282,8 @@ func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []mov
 	rookBitboard := b.Bitboards[pieceColor|piece.TypeRook]
 	startIndex := bits.TrailingZeros64(kingBitboard)
 
-	allOccupiedFields := b.Pieces[2]
-	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
+	allOccupiedFields := b.OccupancyBitboards[2]
+	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
 	enemyAttackFields := ComputedAttacks[1-((pieceColor>>3)-1)]
 
 	for i, offset := range DirectionalOffsets {
@@ -404,8 +404,8 @@ func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	var straightSlidingAttacks uint64
 
 	pieceBitboard := b.Bitboards[colorToMove|piece.TypeRook] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
-	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
-	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
+	ownPiecesBitboard := b.OccupancyBitboards[(colorToMove>>3)-1]
+	enemyPiecesBitboard := b.OccupancyBitboards[1-((colorToMove>>3)-1)]
 
 	enemyColor := piece.ColorBlack
 	if colorToMove != piece.ColorWhite {
@@ -457,8 +457,8 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	var diagonalSlidingAttacks uint64
 
 	pieceBitboard := b.Bitboards[colorToMove|piece.TypeBishop] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
-	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
-	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
+	ownPiecesBitboard := b.OccupancyBitboards[(colorToMove>>3)-1]
+	enemyPiecesBitboard := b.OccupancyBitboards[1-((colorToMove>>3)-1)]
 
 	enemyColor := piece.ColorBlack
 	if colorToMove != piece.ColorWhite {
@@ -542,8 +542,8 @@ func StraightPins(b *board.Board, colorToMove uint) uint64 {
 
 	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
 
-	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
-	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
+	ownPiecesBitboard := b.OccupancyBitboards[(colorToMove>>3)-1]
+	enemyPiecesBitboard := b.OccupancyBitboards[1-((colorToMove>>3)-1)]
 
 	enemyColor := piece.ColorWhite
 	if colorToMove == piece.ColorWhite {
@@ -605,8 +605,8 @@ func DiagonalPins(b *board.Board, colorToMove uint) uint64 {
 	var pinnedPieces uint64
 
 	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
-	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
-	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
+	ownPiecesBitboard := b.OccupancyBitboards[(colorToMove>>3)-1]
+	enemyPiecesBitboard := b.OccupancyBitboards[1-((colorToMove>>3)-1)]
 
 	enemyColor := piece.ColorWhite
 	if colorToMove == piece.ColorWhite {
@@ -690,8 +690,8 @@ func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
 	enemyKnightsBitboard := b.Bitboards[enemyColor|piece.TypeKnight]
 	enemyPawnsBitboard := b.Bitboards[enemyColor|piece.TypePawn]
 
-	otherPiecesStraight := b.Pieces[2] & ^enemyStraightAttackers
-	otherPiecesDiagonal := b.Pieces[2] & ^enemyDiagonalAttackers
+	otherPiecesStraight := b.OccupancyBitboards[2] & ^enemyStraightAttackers
+	otherPiecesDiagonal := b.OccupancyBitboards[2] & ^enemyDiagonalAttackers
 
 	kingIndex := bits.TrailingZeros64(kingBitboard)
 

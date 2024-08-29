@@ -32,7 +32,6 @@ type Game struct {
 	moveCount             int
 
 	stateStack []State
-	moveStack  []string
 }
 
 func New(fenString string) *Game {
@@ -147,7 +146,6 @@ func (g *Game) ToFEN() string {
 func (g *Game) MakeMove(m move.Move) {
 	// Update the stack
 	g.stateStack = append(g.stateStack, State{g.castlingAvailability, g.enPassantTargetSquare, g.halfMoves, g.moveCount})
-	g.moveStack = append(g.moveStack, move.PrintSimple(m))
 
 	// Set new castling availability
 	kingSideRookStart := 7
@@ -200,7 +198,7 @@ func (g *Game) MakeMove(m move.Move) {
 	g.b.MakeMove(m)
 
 	// Precompute pins, attacks and shared bitboards
-	g.b.ComputeBitboards()
+	g.b.ComputeOccupancyBitboards()
 	movegenerator.ComputeAll(g.b)
 
 	// Switch around the color
@@ -217,7 +215,6 @@ func (g *Game) UnmakeMove() {
 	g.moveCount = latestGameState.moveCount
 
 	g.stateStack = g.stateStack[:len(g.stateStack)-1]
-	g.moveStack = g.moveStack[:len(g.moveStack)-1]
 
 	// Unmake move on board
 	g.b.UnmakeMove()
@@ -225,7 +222,7 @@ func (g *Game) UnmakeMove() {
 	g.OtherColorToMove()
 
 	// Precompute pins, attacks and shared bitboards
-	g.b.ComputeBitboards()
+	g.b.ComputeOccupancyBitboards()
 	movegenerator.ComputeAll(g.b)
 }
 
