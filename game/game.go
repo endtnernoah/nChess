@@ -86,7 +86,7 @@ func New(fenString string) *Game {
 	g.moveCount = data
 
 	// Precomputing
-	movegenerator.ComputeAll(g.b, "SETUP")
+	movegenerator.ComputeAll(g.b)
 
 	return &g
 }
@@ -94,7 +94,7 @@ func New(fenString string) *Game {
 func (g *Game) ToFEN() string {
 	var fen strings.Builder
 
-	fen.WriteString(g.Board().ToFEN())
+	fen.WriteString(g.b.ToFEN())
 
 	// Active color
 	fen.WriteString(" ")
@@ -133,11 +133,11 @@ func (g *Game) ToFEN() string {
 		fen.WriteString(boardhelper.IndexToSquare(g.enPassantTargetSquare))
 	}
 
-	// Halfmove clock
+	// Half-Move clock
 	fen.WriteString(" ")
 	fen.WriteString(strconv.Itoa(g.halfMoves))
 
-	// Fullmove number
+	// Full-Move number
 	fen.WriteString(" ")
 	fen.WriteString(strconv.Itoa(g.moveCount))
 
@@ -197,26 +197,11 @@ func (g *Game) MakeMove(m move.Move) {
 	}
 
 	// Make the move on board
-	g.Board().MakeMove(m)
+	g.b.MakeMove(m)
 
 	// Precompute pins, attacks and shared bitboards
 	g.b.ComputeBitboards()
-
-	kingBitboard1 := g.b.PieceBitboard(piece.ColorWhite | piece.TypeKing)
-	if kingBitboard1 == 0 {
-		fmt.Println(g.moveStack)
-		g.DisplayBoardPretty()
-		fmt.Println(g.ToFEN())
-		fmt.Println(formatter.FormatUnicodeBoardWithBorders(formatter.ToUnicodeBoard(map[uint64]string{movegenerator.ComputedPins[0]: "X"})))
-	}
-	kingBitboard2 := g.b.PieceBitboard(piece.ColorBlack | piece.TypeKing)
-	if kingBitboard2 == 0 {
-		fmt.Println(g.moveStack)
-		g.DisplayBoardPretty()
-		fmt.Println(g.ToFEN())
-		fmt.Println(formatter.FormatUnicodeBoardWithBorders(formatter.ToUnicodeBoard(map[uint64]string{movegenerator.ComputedPins[1]: "X"})))
-	}
-	movegenerator.ComputeAll(g.b, "DO")
+	movegenerator.ComputeAll(g.b)
 
 	// Switch around the color
 	g.OtherColorToMove()
@@ -235,22 +220,16 @@ func (g *Game) UnmakeMove() {
 	g.moveStack = g.moveStack[:len(g.moveStack)-1]
 
 	// Unmake move on board
-	g.Board().UnmakeMove()
+	g.b.UnmakeMove()
 
 	g.OtherColorToMove()
 
 	// Precompute pins, attacks and shared bitboards
 	g.b.ComputeBitboards()
-	movegenerator.ComputeAll(g.b, "UNDO")
+	movegenerator.ComputeAll(g.b)
 }
 
 func (g *Game) OtherColorToMove() { g.whiteToMove = !g.whiteToMove }
-
-func (g *Game) WhiteToMove() bool { return g.whiteToMove }
-
-func (g *Game) Board() *board.Board {
-	return g.b
-}
 
 func (g *Game) DisplayBoard() {
 	unicodeBoard := formatter.ToUnicodeBoard(formatter.BitboardMappingAll(g.b))
@@ -262,7 +241,7 @@ func (g *Game) DisplayBoardPretty() {
 	fmt.Println(formatter.FormatUnicodeBoardWithBorders(unicodeBoard))
 }
 
-func (g *Game) GeneratePseudoLegalMoves() []move.Move {
+func (g *Game) PseudoLegalMoves() []move.Move {
 	/*
 		Creating pseudo-legal moves in an iterative approach. This function is used in the actual implementation.
 	*/
@@ -284,7 +263,7 @@ func (g *Game) GeneratePseudoLegalMoves() []move.Move {
 	return pseudoLegalMoves
 }
 
-func (g *Game) GeneratePseudoLegalMovesParallel() []move.Move {
+func (g *Game) PseudoLegalMovesParallel() []move.Move {
 	/*
 		Generating all pseudo-legal moves in parallel. Somehow, this is slower than generating them in a normal way.
 		I have not figured out why, so I am leaving this function in here. One possible reason might be the overhead the parallelization creates.
@@ -344,14 +323,14 @@ func (g *Game) GeneratePseudoLegalMovesParallel() []move.Move {
 	return pseudoLegalMoves
 }
 
-func (g *Game) GenerateLegalMoves() []move.Move {
+func (g *Game) LegalMoves() []move.Move {
 	/*
 		Filtering out all illegal moves
 	*/
 
 	legalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
 
-	pseudoLegalMoves := g.GeneratePseudoLegalMoves()
+	pseudoLegalMoves := g.PseudoLegalMoves()
 
 	colorToMove := piece.ColorWhite
 
@@ -359,7 +338,7 @@ func (g *Game) GenerateLegalMoves() []move.Move {
 		colorToMove = piece.ColorBlack
 	}
 
-	ownKingBitboard := g.b.PieceBitboard(colorToMove | piece.TypeKing)
+	ownKingBitboard := g.b.Bitboards[colorToMove|piece.TypeKing]
 	ownPinnedPieces := movegenerator.ComputedPins[(colorToMove>>3)-1]
 
 	ownKingIndex := bits.TrailingZeros64(ownKingBitboard)
@@ -388,7 +367,7 @@ func (g *Game) GenerateLegalMoves() []move.Move {
 			// King is in single check
 			if checkCount == 1 {
 
-				// If a move is not to any of the proctect square OR not a king move
+				// If a move is not to any of the protect square OR not a king move
 				if !boardhelper.IsIndexBitSet(m.TargetIndex, possibleProtectMoves) && (ownKingIndex != m.StartIndex) {
 
 					// Move can not enPassantCapture the checking pawn, not allowed
@@ -429,7 +408,7 @@ func (g *Game) Perft(ply int) int64 {
 		return 1
 	}
 
-	legalMoves := g.GenerateLegalMoves()
+	legalMoves := g.LegalMoves()
 	var totalNodes int64 = 0
 
 	// Not the official implementation, but works a lot faster

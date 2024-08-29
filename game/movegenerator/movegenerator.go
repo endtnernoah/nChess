@@ -5,7 +5,6 @@ import (
 	"endtner.dev/nChess/game/boardhelper"
 	"endtner.dev/nChess/game/move"
 	"endtner.dev/nChess/game/piece"
-	"fmt"
 	"math/bits"
 )
 
@@ -13,7 +12,7 @@ import (
 	MoveGenerator is now responsible for generating all Bitboards. THIS CODE DOES NOT RUN IN PARALLEL!
 
 	When parallelized, other generators will override these variables for a given generator, so everything crashes.
-	I tried instancing the movegenerator per class, that created so much overhead that the performance increase was mitigated.
+	I tried instancing the generator per class, that created so much overhead that the performance increase was mitigated.
 */
 
 var DirectionalOffsets = []int{8, -8, -1, 1, 7, -7, 9, -9}
@@ -60,11 +59,11 @@ func computeDistanceToEdges() [][]int {
 	return precomputedDistances
 }
 
-func ComputeAll(b *board.Board, source string) {
+func ComputeAll(b *board.Board) {
 	ComputeAttacks(b, piece.ColorWhite)
 	ComputeAttacks(b, piece.ColorBlack)
-	ComputePins(b, piece.ColorWhite, source)
-	ComputePins(b, piece.ColorBlack, source)
+	ComputePins(b, piece.ColorWhite)
+	ComputePins(b, piece.ColorBlack)
 }
 
 /*
@@ -87,7 +86,7 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
 	occupiedFields := b.Pieces[2]
 
-	pawnBitboard := b.PieceBitboard(pieceColor | piece.TypePawn)
+	pawnBitboard := b.Bitboards[pieceColor|piece.TypePawn]
 	for pawnBitboard != 0 {
 		// Get index of LSB
 		startIndex := bits.TrailingZeros64(pawnBitboard)
@@ -175,7 +174,7 @@ func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
 	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
 
-	piecesBitboard := b.PieceBitboard(pieceColor|piece.TypeRook) | b.PieceBitboard(pieceColor|piece.TypeQueen)
+	piecesBitboard := b.Bitboards[pieceColor|piece.TypeRook] | b.Bitboards[pieceColor|piece.TypeQueen]
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 
@@ -215,7 +214,7 @@ func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
 	enemyOccupiedFields := b.Pieces[1-((pieceColor>>3)-1)]
 
-	piecesBitboard := b.PieceBitboard(pieceColor|piece.TypeBishop) | b.PieceBitboard(pieceColor|piece.TypeQueen)
+	piecesBitboard := b.Bitboards[pieceColor|piece.TypeBishop] | b.Bitboards[pieceColor|piece.TypeQueen]
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 
@@ -254,7 +253,7 @@ func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
 
 	ownOccupiedFields := b.Pieces[(pieceColor>>3)-1]
 
-	piecesBitboard := b.PieceBitboard(pieceColor | piece.TypeKnight)
+	piecesBitboard := b.Bitboards[pieceColor|piece.TypeKnight]
 	for piecesBitboard != 0 {
 		// Get index of LSB
 		startIndex := bits.TrailingZeros64(piecesBitboard)
@@ -279,8 +278,8 @@ func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
 func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []move.Move {
 	var kingMoves []move.Move
 
-	kingBitboard := b.PieceBitboard(pieceColor | piece.TypeKing)
-	rookBitboard := b.PieceBitboard(pieceColor | piece.TypeRook)
+	kingBitboard := b.Bitboards[pieceColor|piece.TypeKing]
+	rookBitboard := b.Bitboards[pieceColor|piece.TypeRook]
 	startIndex := bits.TrailingZeros64(kingBitboard)
 
 	allOccupiedFields := b.Pieces[2]
@@ -378,7 +377,7 @@ func PawnAttacks(b *board.Board, colorToMove uint) uint64 {
 		pawnIndexOffset = -8
 	}
 
-	pieceBitboard := b.PieceBitboard(colorToMove | piece.TypePawn)
+	pieceBitboard := b.Bitboards[colorToMove|piece.TypePawn]
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
@@ -404,7 +403,7 @@ func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	straightIndexOffsets := []int{1, -1, 8, -8}
 	var straightSlidingAttacks uint64
 
-	pieceBitboard := b.PieceBitboard(colorToMove|piece.TypeRook) | b.PieceBitboard(colorToMove|piece.TypeQueen) | b.PieceBitboard(colorToMove|piece.TypeKing)
+	pieceBitboard := b.Bitboards[colorToMove|piece.TypeRook] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
 	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
 	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
 
@@ -412,7 +411,7 @@ func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	if colorToMove != piece.ColorWhite {
 		enemyColor = piece.ColorWhite
 	}
-	enemyKingIndex := bits.TrailingZeros64(b.PieceBitboard(enemyColor | piece.TypeKing))
+	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.TypeKing])
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
@@ -457,7 +456,7 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	diagonalIndexOffsets := []int{-7, 7, -9, 9}
 	var diagonalSlidingAttacks uint64
 
-	pieceBitboard := b.PieceBitboard(colorToMove|piece.TypeBishop) | b.PieceBitboard(colorToMove|piece.TypeQueen) | b.PieceBitboard(colorToMove|piece.TypeKing)
+	pieceBitboard := b.Bitboards[colorToMove|piece.TypeBishop] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
 	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
 	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
 
@@ -465,7 +464,7 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	if colorToMove != piece.ColorWhite {
 		enemyColor = piece.ColorWhite
 	}
-	enemyKingIndex := bits.TrailingZeros64(b.PieceBitboard(enemyColor | piece.TypeKing))
+	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.TypeKing])
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
@@ -510,7 +509,7 @@ func KnightAttacks(b *board.Board, colorToMove uint) uint64 {
 	knightIndexOffsets := []int{-6, 6, -10, 10, -15, 15, -17, 17}
 	var knightAttacks uint64
 
-	pieceBitboard := b.PieceBitboard(colorToMove | piece.TypeKnight)
+	pieceBitboard := b.Bitboards[colorToMove|piece.TypeKnight]
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
@@ -531,22 +530,17 @@ func KnightAttacks(b *board.Board, colorToMove uint) uint64 {
 	Calculating pins
 */
 
-func ComputePins(b *board.Board, color uint, source string) {
-	straightPinnedPieces := StraightPins(b, color, source)
+func ComputePins(b *board.Board, color uint) {
+	straightPinnedPieces := StraightPins(b, color)
 	diagonalPinnedPieces := DiagonalPins(b, color)
 
 	ComputedPins[(color>>3)-1] = straightPinnedPieces | diagonalPinnedPieces
 }
 
-func StraightPins(b *board.Board, colorToMove uint, source string) uint64 {
+func StraightPins(b *board.Board, colorToMove uint) uint64 {
 	var pinnedPieces uint64
 
-	kingBitboard := b.PieceBitboard(colorToMove | piece.TypeKing)
-	kingIndex := bits.TrailingZeros64(kingBitboard)
-
-	if kingIndex == 64 {
-		fmt.Println(source)
-	}
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
 
 	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
 	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
@@ -556,7 +550,7 @@ func StraightPins(b *board.Board, colorToMove uint, source string) uint64 {
 		enemyColor = piece.ColorBlack
 	}
 
-	attackingEnemyPiecesBitboard := b.PieceBitboard(enemyColor|piece.TypeRook) | b.PieceBitboard(enemyColor|piece.TypeQueen)
+	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.TypeRook] | b.Bitboards[enemyColor|piece.TypeQueen]
 	otherEnemyPiecesBitboard := enemyPiecesBitboard & ^attackingEnemyPiecesBitboard
 
 	for i, offset := range DirectionalOffsets[:4] {
@@ -610,7 +604,7 @@ func StraightPins(b *board.Board, colorToMove uint, source string) uint64 {
 func DiagonalPins(b *board.Board, colorToMove uint) uint64 {
 	var pinnedPieces uint64
 
-	kingIndex := bits.TrailingZeros64(b.PieceBitboard(colorToMove | piece.TypeKing))
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
 	ownPiecesBitboard := b.Pieces[(colorToMove>>3)-1]
 	enemyPiecesBitboard := b.Pieces[1-((colorToMove>>3)-1)]
 
@@ -619,7 +613,7 @@ func DiagonalPins(b *board.Board, colorToMove uint) uint64 {
 		enemyColor = piece.ColorBlack
 	}
 
-	attackingEnemyPiecesBitboard := b.PieceBitboard(enemyColor|piece.TypeBishop) | b.PieceBitboard(enemyColor|piece.TypeQueen)
+	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.TypeBishop] | b.Bitboards[enemyColor|piece.TypeQueen]
 	otherEnemyPiecesBitboard := enemyPiecesBitboard & ^attackingEnemyPiecesBitboard
 
 	for i, offset := range DirectionalOffsets[4:] {
@@ -689,12 +683,12 @@ func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
 		indexOffsetsPawns = []int{-7, -9}
 	}
 
-	kingBitboard := b.PieceBitboard(colorToMove | piece.TypeKing)
+	kingBitboard := b.Bitboards[colorToMove|piece.TypeKing]
 
-	enemyStraightAttackers := b.PieceBitboard(enemyColor|piece.TypeRook) | b.PieceBitboard(enemyColor|piece.TypeQueen)
-	enemyDiagonalAttackers := b.PieceBitboard(enemyColor|piece.TypeBishop) | b.PieceBitboard(enemyColor|piece.TypeQueen)
-	enemyKnightsBitboard := b.PieceBitboard(enemyColor | piece.TypeKnight)
-	enemyPawnsBitboard := b.PieceBitboard(enemyColor | piece.TypePawn)
+	enemyStraightAttackers := b.Bitboards[enemyColor|piece.TypeRook] | b.Bitboards[enemyColor|piece.TypeQueen]
+	enemyDiagonalAttackers := b.Bitboards[enemyColor|piece.TypeBishop] | b.Bitboards[enemyColor|piece.TypeQueen]
+	enemyKnightsBitboard := b.Bitboards[enemyColor|piece.TypeKnight]
+	enemyPawnsBitboard := b.Bitboards[enemyColor|piece.TypePawn]
 
 	otherPiecesStraight := b.Pieces[2] & ^enemyStraightAttackers
 	otherPiecesDiagonal := b.Pieces[2] & ^enemyDiagonalAttackers
