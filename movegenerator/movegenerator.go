@@ -88,10 +88,10 @@ func ComputeAll(b *board.Board) {
 	var blackPieces uint64
 
 	for p, bitboard := range b.Bitboards {
-		if uint(p)&piece.ColorWhite == piece.ColorWhite {
+		if uint8(p)&piece.White == piece.White {
 			whitePieces |= bitboard
 		}
-		if uint(p)&piece.ColorBlack == piece.ColorBlack {
+		if uint8(p)&piece.Black == piece.Black {
 			blackPieces |= bitboard
 		}
 	}
@@ -100,10 +100,10 @@ func ComputeAll(b *board.Board) {
 	ComputedOccupancy[1] = blackPieces
 	ComputedOccupancy[2] = whitePieces | blackPieces
 
-	ComputeAttacks(b, piece.ColorWhite)
-	ComputeAttacks(b, piece.ColorBlack)
-	ComputePins(b, piece.ColorWhite)
-	ComputePins(b, piece.ColorBlack)
+	ComputeAttacks(b, piece.White)
+	ComputeAttacks(b, piece.Black)
+	ComputePins(b, piece.White)
+	ComputePins(b, piece.Black)
 }
 
 /*
@@ -117,10 +117,10 @@ func PseudoLegalMoves(b *board.Board) []move.Move {
 
 	pseudoLegalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
 
-	colorToMove := piece.ColorWhite
+	colorToMove := piece.White
 
 	if !b.WhiteToMove {
-		colorToMove = piece.ColorBlack
+		colorToMove = piece.Black
 	}
 
 	pseudoLegalMoves = append(pseudoLegalMoves, PawnMoves(b, colorToMove, b.EnPassantTargetSquare)...)
@@ -141,37 +141,37 @@ func PseudoLegalMovesParallel(b *board.Board) []move.Move {
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(5)
 
-	colorToMove := piece.ColorWhite
+	colorToMove := piece.White
 	if !b.WhiteToMove {
-		colorToMove = piece.ColorBlack
+		colorToMove = piece.Black
 	}
 
 	// Pawn moves
-	go func(b *board.Board, colorToMove uint, enPassantTargetSquare int) {
+	go func(b *board.Board, colorToMove uint8, enPassantTargetSquare int) {
 		defer waitGroup.Done()
 		pseudoLegalMovesChan <- PawnMoves(b, colorToMove, enPassantTargetSquare)
 	}(b, colorToMove, b.EnPassantTargetSquare)
 
 	// Straight sliding moves
-	go func(b *board.Board, colorToMove uint) {
+	go func(b *board.Board, colorToMove uint8) {
 		defer waitGroup.Done()
 		pseudoLegalMovesChan <- StraightSlidingMoves(b, colorToMove)
 	}(b, colorToMove)
 
 	// Diagonal sliding moves
-	go func(b *board.Board, colorToMove uint) {
+	go func(b *board.Board, colorToMove uint8) {
 		defer waitGroup.Done()
 		pseudoLegalMovesChan <- DiagonalSlidingMoves(b, colorToMove)
 	}(b, colorToMove)
 
 	// Knight moves
-	go func(b *board.Board, colorToMove uint) {
+	go func(b *board.Board, colorToMove uint8) {
 		defer waitGroup.Done()
 		pseudoLegalMovesChan <- KnightMoves(b, colorToMove)
 	}(b, colorToMove)
 
 	// King moves
-	go func(b *board.Board, colorToMove uint, castlingAvailability uint) {
+	go func(b *board.Board, colorToMove uint8, castlingAvailability uint8) {
 		defer waitGroup.Done()
 		pseudoLegalMovesChan <- KingMoves(b, colorToMove, castlingAvailability)
 	}(b, colorToMove, b.CastlingAvailability)
@@ -203,13 +203,13 @@ func LegalMoves(b *board.Board) []move.Move {
 
 	pseudoLegalMoves := PseudoLegalMoves(b)
 
-	colorToMove := piece.ColorWhite
+	colorToMove := piece.White
 
 	if !b.WhiteToMove {
-		colorToMove = piece.ColorBlack
+		colorToMove = piece.Black
 	}
 
-	ownKingBitboard := b.Bitboards[colorToMove|piece.TypeKing]
+	ownKingBitboard := b.Bitboards[colorToMove|piece.King]
 	ownPinnedPieces := ComputedPins[(colorToMove>>3)-1]
 
 	ownKingIndex := bits.TrailingZeros64(ownKingBitboard)
@@ -270,7 +270,7 @@ func LegalMoves(b *board.Board) []move.Move {
 	return legalMoves
 }
 
-func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []move.Move {
+func PawnMoves(b *board.Board, pieceColor uint8, enPassantTargetSquare int) []move.Move {
 	var pawnMoves []move.Move
 
 	// Default offset for white
@@ -278,7 +278,7 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 	promotionRank := 7
 
 	// Change offset for black
-	if pieceColor != piece.ColorWhite {
+	if pieceColor != piece.White {
 		pawnIndexOffset = -8
 		promotionRank = 0
 	}
@@ -286,7 +286,7 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 	enemyOccupiedFields := ComputedOccupancy[1-((pieceColor>>3)-1)]
 	occupiedFields := ComputedOccupancy[2]
 
-	pawnBitboard := b.Bitboards[pieceColor|piece.TypePawn]
+	pawnBitboard := b.Bitboards[pieceColor|piece.Pawn]
 	for pawnBitboard != 0 {
 		// Get index of LSB
 		startIndex := bits.TrailingZeros64(pawnBitboard)
@@ -304,10 +304,10 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 		if !boardhelper.IsIndexBitSet(targetIndex, occupiedFields) {
 			// Add all promotion moves
 			if promotionFlag {
-				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.TypeKnight)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.TypeBishop)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.TypeQueen)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.TypeRook)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.Knight)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.Bishop)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.Queen)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex, move.WithPromotion(pieceColor|piece.Rook)))
 			} else {
 				pawnMoves = append(pawnMoves, move.New(startIndex, targetIndex))
 			}
@@ -315,7 +315,7 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 
 		// Check if the pawn is on starting square
 		isStartingSquare := startIndex >= 8 && startIndex < 16
-		if pieceColor != piece.ColorWhite {
+		if pieceColor != piece.White {
 			isStartingSquare = startIndex >= 48 && startIndex < 56
 		}
 
@@ -334,20 +334,20 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 		// Add move if it is in the same target row and targets are not empty
 		if boardhelper.IsValidDiagonalMove(startIndex, side1) && boardhelper.IsIndexBitSet(side1, enemyOccupiedFields) {
 			if promotionFlag {
-				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.TypeKnight)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.TypeBishop)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.TypeQueen)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.TypeRook)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.Knight)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.Bishop)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.Queen)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side1, move.WithPromotion(pieceColor|piece.Rook)))
 			} else {
 				pawnMoves = append(pawnMoves, move.New(startIndex, side1))
 			}
 		}
 		if boardhelper.IsValidDiagonalMove(startIndex, side2) && boardhelper.IsIndexBitSet(side2, enemyOccupiedFields) {
 			if promotionFlag {
-				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.TypeKnight)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.TypeBishop)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.TypeQueen)))
-				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.TypeRook)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.Knight)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.Bishop)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.Queen)))
+				pawnMoves = append(pawnMoves, move.New(startIndex, side2, move.WithPromotion(pieceColor|piece.Rook)))
 			} else {
 				pawnMoves = append(pawnMoves, move.New(startIndex, side2))
 			}
@@ -368,13 +368,13 @@ func PawnMoves(b *board.Board, pieceColor uint, enPassantTargetSquare int) []mov
 	return pawnMoves
 }
 
-func SlidingMoves(b *board.Board, pieceColor uint) []move.Move {
+func SlidingMoves(b *board.Board, pieceColor uint8) []move.Move {
 	var slidingMoves []move.Move
 
 	ownOccupiedFields := ComputedOccupancy[(pieceColor>>3)-1]
 	enemyOccupiedFields := ComputedOccupancy[1-((pieceColor>>3)-1)]
 
-	piecesBitboard := b.Bitboards[pieceColor|piece.TypeRook] | b.Bitboards[pieceColor|piece.TypeBishop] | b.Bitboards[pieceColor|piece.TypeQueen]
+	piecesBitboard := b.Bitboards[pieceColor|piece.Rook] | b.Bitboards[pieceColor|piece.Bishop] | b.Bitboards[pieceColor|piece.Queen]
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 		pieceType := b.Pieces[startIndex] & 0b00111
@@ -383,10 +383,10 @@ func SlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 		offsetIndexEnd := 8
 
 		// Manipulating indices based on piece type
-		if pieceType == piece.TypeRook {
+		if pieceType == piece.Rook {
 			offsetIndexEnd = 4
 		}
-		if pieceType == piece.TypeBishop {
+		if pieceType == piece.Bishop {
 			offsetIndexStart = 4
 		}
 
@@ -417,13 +417,13 @@ func SlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	return slidingMoves
 }
 
-func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
+func StraightSlidingMoves(b *board.Board, pieceColor uint8) []move.Move {
 	var straightSlidingMoves []move.Move
 
 	ownOccupiedFields := ComputedOccupancy[(pieceColor>>3)-1]
 	enemyOccupiedFields := ComputedOccupancy[1-((pieceColor>>3)-1)]
 
-	piecesBitboard := b.Bitboards[pieceColor|piece.TypeRook] | b.Bitboards[pieceColor|piece.TypeQueen]
+	piecesBitboard := b.Bitboards[pieceColor|piece.Rook] | b.Bitboards[pieceColor|piece.Queen]
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 
@@ -455,13 +455,13 @@ func StraightSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	return straightSlidingMoves
 }
 
-func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
+func DiagonalSlidingMoves(b *board.Board, pieceColor uint8) []move.Move {
 	var diagonalSlidingMoves []move.Move
 
 	ownOccupiedFields := ComputedOccupancy[(pieceColor>>3)-1]
 	enemyOccupiedFields := ComputedOccupancy[1-((pieceColor>>3)-1)]
 
-	piecesBitboard := b.Bitboards[pieceColor|piece.TypeBishop] | b.Bitboards[pieceColor|piece.TypeQueen]
+	piecesBitboard := b.Bitboards[pieceColor|piece.Bishop] | b.Bitboards[pieceColor|piece.Queen]
 	for piecesBitboard != 0 {
 		startIndex := bits.TrailingZeros64(piecesBitboard)
 
@@ -495,12 +495,12 @@ func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 	return diagonalSlidingMoves
 }
 
-func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
+func KnightMoves(b *board.Board, pieceColor uint8) []move.Move {
 	var validMoves []move.Move
 
 	ownOccupiedFields := ComputedOccupancy[(pieceColor>>3)-1]
 
-	knights := b.Bitboards[pieceColor|piece.TypeKnight]
+	knights := b.Bitboards[pieceColor|piece.Knight]
 	for knights != 0 {
 		startIndex := bits.TrailingZeros64(knights)
 		validMoveMask := ComputedKnightMoves[startIndex] & ^ownOccupiedFields
@@ -516,11 +516,11 @@ func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
 	return validMoves
 }
 
-func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []move.Move {
+func KingMoves(b *board.Board, pieceColor uint8, castlingAvailability uint8) []move.Move {
 	var kingMoves []move.Move
 
-	kingBitboard := b.Bitboards[pieceColor|piece.TypeKing]
-	rookBitboard := b.Bitboards[pieceColor|piece.TypeRook]
+	kingBitboard := b.Bitboards[pieceColor|piece.King]
+	rookBitboard := b.Bitboards[pieceColor|piece.Rook]
 	startIndex := bits.TrailingZeros64(kingBitboard)
 
 	allOccupiedFields := ComputedOccupancy[2]
@@ -544,7 +544,7 @@ func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []mov
 	}
 
 	initialKingSquare := 4
-	if pieceColor != piece.ColorWhite {
+	if pieceColor != piece.White {
 		initialKingSquare = 60
 	}
 
@@ -565,7 +565,7 @@ func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []mov
 	var kingSideAttackMask uint64 = 1<<startIndex | 1<<(startIndex+1) | 1<<(startIndex+2)
 	var queenSideAttackMask uint64 = 1<<startIndex | 1<<(startIndex-1) | 1<<(startIndex-2)
 
-	if pieceColor != piece.ColorWhite {
+	if pieceColor != piece.White {
 		kingSideAllowed = castlingAvailability&0b0010 != 0
 		queenSideAllowed = castlingAvailability&0b0001 != 0
 
@@ -597,7 +597,7 @@ func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []mov
 	Attack pattern generators
 */
 
-func ComputeAttacks(b *board.Board, color uint) {
+func ComputeAttacks(b *board.Board, color uint8) {
 	pawnAttacks := PawnAttacks(b, color)
 	straightSlidingAttacks := StraightSlidingAttacks(b, color)
 	diagonalSlidingAttacks := DiagonalSlidingAttacks(b, color)
@@ -609,16 +609,16 @@ func ComputeAttacks(b *board.Board, color uint) {
 		knightAttacks
 }
 
-func PawnAttacks(b *board.Board, colorToMove uint) uint64 {
+func PawnAttacks(b *board.Board, colorToMove uint8) uint64 {
 	var pawnAttacks uint64
 
 	pawnIndexOffset := 8
 
-	if colorToMove != piece.ColorWhite {
+	if colorToMove != piece.White {
 		pawnIndexOffset = -8
 	}
 
-	pieceBitboard := b.Bitboards[colorToMove|piece.TypePawn]
+	pieceBitboard := b.Bitboards[colorToMove|piece.Pawn]
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
@@ -640,25 +640,25 @@ func PawnAttacks(b *board.Board, colorToMove uint) uint64 {
 	return pawnAttacks
 }
 
-func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
+func StraightSlidingAttacks(b *board.Board, colorToMove uint8) uint64 {
 	straightIndexOffsets := []int{1, -1, 8, -8}
 	var straightSlidingAttacks uint64
 
-	pieceBitboard := b.Bitboards[colorToMove|piece.TypeRook] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
+	pieceBitboard := b.Bitboards[colorToMove|piece.Rook] | b.Bitboards[colorToMove|piece.Queen] | b.Bitboards[colorToMove|piece.King]
 	ownPiecesBitboard := ComputedOccupancy[(colorToMove>>3)-1]
 	enemyPiecesBitboard := ComputedOccupancy[1-((colorToMove>>3)-1)]
 
-	enemyColor := piece.ColorBlack
-	if colorToMove != piece.ColorWhite {
-		enemyColor = piece.ColorWhite
+	enemyColor := piece.Black
+	if colorToMove != piece.White {
+		enemyColor = piece.White
 	}
-	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.TypeKing])
+	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.King])
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
 
 		maxLength := 8
-		if (b.Pieces[startIndex] & 0b00111) == piece.TypeKing {
+		if (b.Pieces[startIndex] & 0b00111) == piece.King {
 			maxLength = 1
 		}
 
@@ -693,25 +693,25 @@ func StraightSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	return straightSlidingAttacks
 }
 
-func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
+func DiagonalSlidingAttacks(b *board.Board, colorToMove uint8) uint64 {
 	diagonalIndexOffsets := []int{-7, 7, -9, 9}
 	var diagonalSlidingAttacks uint64
 
-	pieceBitboard := b.Bitboards[colorToMove|piece.TypeBishop] | b.Bitboards[colorToMove|piece.TypeQueen] | b.Bitboards[colorToMove|piece.TypeKing]
+	pieceBitboard := b.Bitboards[colorToMove|piece.Bishop] | b.Bitboards[colorToMove|piece.Queen] | b.Bitboards[colorToMove|piece.King]
 	ownPiecesBitboard := ComputedOccupancy[(colorToMove>>3)-1]
 	enemyPiecesBitboard := ComputedOccupancy[1-((colorToMove>>3)-1)]
 
-	enemyColor := piece.ColorBlack
-	if colorToMove != piece.ColorWhite {
-		enemyColor = piece.ColorWhite
+	enemyColor := piece.Black
+	if colorToMove != piece.White {
+		enemyColor = piece.White
 	}
-	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.TypeKing])
+	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[enemyColor|piece.King])
 
 	for pieceBitboard != 0 {
 		startIndex := bits.TrailingZeros64(pieceBitboard)
 
 		maxLength := 8
-		if (b.Pieces[startIndex] & 0b00111) == piece.TypeKing {
+		if (b.Pieces[startIndex] & 0b00111) == piece.King {
 			maxLength = 1
 		}
 
@@ -746,10 +746,10 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 	return diagonalSlidingAttacks
 }
 
-func KnightAttacks(b *board.Board, colorToMove uint) uint64 {
+func KnightAttacks(b *board.Board, colorToMove uint8) uint64 {
 	var attacks uint64
 
-	knights := b.Bitboards[colorToMove|piece.TypeKnight]
+	knights := b.Bitboards[colorToMove|piece.Knight]
 	for knights != 0 {
 		attacks |= ComputedKnightMoves[bits.TrailingZeros64(knights)]
 		knights &= knights - 1
@@ -762,27 +762,27 @@ func KnightAttacks(b *board.Board, colorToMove uint) uint64 {
 	Calculating pins
 */
 
-func ComputePins(b *board.Board, color uint) {
+func ComputePins(b *board.Board, color uint8) {
 	straightPinnedPieces := StraightPins(b, color)
 	diagonalPinnedPieces := DiagonalPins(b, color)
 
 	ComputedPins[(color>>3)-1] = straightPinnedPieces | diagonalPinnedPieces
 }
 
-func StraightPins(b *board.Board, colorToMove uint) uint64 {
+func StraightPins(b *board.Board, colorToMove uint8) uint64 {
 	var pinnedPieces uint64
 
-	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.King])
 
 	ownPiecesBitboard := ComputedOccupancy[(colorToMove>>3)-1]
 	enemyPiecesBitboard := ComputedOccupancy[1-((colorToMove>>3)-1)]
 
-	enemyColor := piece.ColorWhite
-	if colorToMove == piece.ColorWhite {
-		enemyColor = piece.ColorBlack
+	enemyColor := piece.White
+	if colorToMove == piece.White {
+		enemyColor = piece.Black
 	}
 
-	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.TypeRook] | b.Bitboards[enemyColor|piece.TypeQueen]
+	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.Rook] | b.Bitboards[enemyColor|piece.Queen]
 	otherEnemyPiecesBitboard := enemyPiecesBitboard & ^attackingEnemyPiecesBitboard
 
 	for i, offset := range DirectionalOffsets[:4] {
@@ -833,19 +833,19 @@ func StraightPins(b *board.Board, colorToMove uint) uint64 {
 	return pinnedPieces
 }
 
-func DiagonalPins(b *board.Board, colorToMove uint) uint64 {
+func DiagonalPins(b *board.Board, colorToMove uint8) uint64 {
 	var pinnedPieces uint64
 
-	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.King])
 	ownPiecesBitboard := ComputedOccupancy[(colorToMove>>3)-1]
 	enemyPiecesBitboard := ComputedOccupancy[1-((colorToMove>>3)-1)]
 
-	enemyColor := piece.ColorWhite
-	if colorToMove == piece.ColorWhite {
-		enemyColor = piece.ColorBlack
+	enemyColor := piece.White
+	if colorToMove == piece.White {
+		enemyColor = piece.Black
 	}
 
-	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.TypeBishop] | b.Bitboards[enemyColor|piece.TypeQueen]
+	attackingEnemyPiecesBitboard := b.Bitboards[enemyColor|piece.Bishop] | b.Bitboards[enemyColor|piece.Queen]
 	otherEnemyPiecesBitboard := enemyPiecesBitboard & ^attackingEnemyPiecesBitboard
 
 	for i, offset := range DirectionalOffsets[4:] {
@@ -900,31 +900,31 @@ func DiagonalPins(b *board.Board, colorToMove uint) uint64 {
 	Valid move squares
 */
 
-func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
+func CheckMask(b *board.Board, colorToMove uint8) (int, uint64) {
 	checkCnt := 0
 	var validMoveMask uint64
 
-	enemyColor := piece.ColorBlack
-	if colorToMove == piece.ColorBlack {
-		enemyColor = piece.ColorWhite
+	enemyColor := piece.Black
+	if colorToMove == piece.Black {
+		enemyColor = piece.White
 	}
 
 	indexOffsetsPawns := []int{7, 9}
 
-	if colorToMove == piece.ColorBlack {
+	if colorToMove == piece.Black {
 		indexOffsetsPawns = []int{-7, -9}
 	}
 
-	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.King])
 
-	enemyStraightAttackers := b.Bitboards[enemyColor|piece.TypeRook] | b.Bitboards[enemyColor|piece.TypeQueen]
-	enemyDiagonalAttackers := b.Bitboards[enemyColor|piece.TypeBishop] | b.Bitboards[enemyColor|piece.TypeQueen]
-	enemyPawnsBitboard := b.Bitboards[enemyColor|piece.TypePawn]
+	enemyStraightAttackers := b.Bitboards[enemyColor|piece.Rook] | b.Bitboards[enemyColor|piece.Queen]
+	enemyDiagonalAttackers := b.Bitboards[enemyColor|piece.Bishop] | b.Bitboards[enemyColor|piece.Queen]
+	enemyPawnsBitboard := b.Bitboards[enemyColor|piece.Pawn]
 
 	otherPiecesStraight := ComputedOccupancy[2] & ^enemyStraightAttackers
 	otherPiecesDiagonal := ComputedOccupancy[2] & ^enemyDiagonalAttackers
 
-	knightAttackMask := ComputedKnightMoves[kingIndex] & b.Bitboards[enemyColor|piece.TypeKnight]
+	knightAttackMask := ComputedKnightMoves[kingIndex] & b.Bitboards[enemyColor|piece.Knight]
 
 	for i, offset := range DirectionalOffsets[:4] {
 		var currentOffsetBitboard uint64
@@ -995,10 +995,10 @@ func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
 	return checkCnt, validMoveMask
 }
 
-func IsPinnedMoveAlongRay(b *board.Board, colorToMove uint, m move.Move) bool {
+func IsPinnedMoveAlongRay(b *board.Board, colorToMove uint8, m move.Move) bool {
 	var rayBitboard uint64
 
-	ownKingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
+	ownKingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.King])
 	enemyPieces := ComputedOccupancy[1-((colorToMove>>3)-1)]
 
 	rayOffset := boardhelper.CalculateRayOffset(ownKingIndex, m.StartIndex)
@@ -1022,14 +1022,14 @@ func IsPinnedMoveAlongRay(b *board.Board, colorToMove uint, m move.Move) bool {
 	return boardhelper.IsIndexBitSet(m.TargetIndex, rayBitboard)
 }
 
-func IsEnPassantMovePinned(b *board.Board, colorToMove uint, m move.Move) bool {
+func IsEnPassantMovePinned(b *board.Board, colorToMove uint8, m move.Move) bool {
 
-	enemyColor := piece.ColorBlack
-	if colorToMove != piece.ColorWhite {
-		enemyColor = piece.ColorWhite
+	enemyColor := piece.Black
+	if colorToMove != piece.White {
+		enemyColor = piece.White
 	}
 
-	ownKingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
+	ownKingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.King])
 
 	// Can instantly return if there is no direct ray between ownKingIndex & enPassantCaptureSquare
 	offset := boardhelper.CalculateRayOffset(ownKingIndex, m.EnPassantCaptureSquare)
@@ -1037,13 +1037,13 @@ func IsEnPassantMovePinned(b *board.Board, colorToMove uint, m move.Move) bool {
 		return false
 	}
 
-	enemyAttackers := b.Bitboards[enemyColor|piece.TypeQueen]
+	enemyAttackers := b.Bitboards[enemyColor|piece.Queen]
 	isValidMoveFunction := boardhelper.IsValidStraightMove
 	switch offset {
 	case -1, 1, -8, 8:
-		enemyAttackers |= b.Bitboards[enemyColor|piece.TypeRook]
+		enemyAttackers |= b.Bitboards[enemyColor|piece.Rook]
 	case -7, 7, -9, 9:
-		enemyAttackers |= b.Bitboards[enemyColor|piece.TypeBishop]
+		enemyAttackers |= b.Bitboards[enemyColor|piece.Bishop]
 		isValidMoveFunction = boardhelper.IsValidDiagonalMove
 	default:
 		return false

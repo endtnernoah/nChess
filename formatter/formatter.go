@@ -9,23 +9,23 @@ import (
 
 func BitboardMappingWhite(b *board.Board) map[uint64]string {
 	return map[uint64]string{
-		b.Bitboards[piece.ColorWhite|piece.TypePawn]:   "♙",
-		b.Bitboards[piece.ColorWhite|piece.TypeRook]:   "♖",
-		b.Bitboards[piece.ColorWhite|piece.TypeKnight]: "♘",
-		b.Bitboards[piece.ColorWhite|piece.TypeBishop]: "♗",
-		b.Bitboards[piece.ColorWhite|piece.TypeQueen]:  "♕",
-		b.Bitboards[piece.ColorWhite|piece.TypeKing]:   "♔",
+		b.Bitboards[piece.White|piece.Pawn]:   "♙",
+		b.Bitboards[piece.White|piece.Rook]:   "♖",
+		b.Bitboards[piece.White|piece.Knight]: "♘",
+		b.Bitboards[piece.White|piece.Bishop]: "♗",
+		b.Bitboards[piece.White|piece.Queen]:  "♕",
+		b.Bitboards[piece.White|piece.King]:   "♔",
 	}
 }
 
 func BitboardMappingBlack(b *board.Board) map[uint64]string {
 	return map[uint64]string{
-		b.Bitboards[piece.ColorBlack|piece.TypePawn]:   "♟",
-		b.Bitboards[piece.ColorBlack|piece.TypeRook]:   "♜",
-		b.Bitboards[piece.ColorBlack|piece.TypeKnight]: "♞",
-		b.Bitboards[piece.ColorBlack|piece.TypeBishop]: "♝",
-		b.Bitboards[piece.ColorBlack|piece.TypeQueen]:  "♛",
-		b.Bitboards[piece.ColorBlack|piece.TypeKing]:   "♚",
+		b.Bitboards[piece.Black|piece.Pawn]:   "♟",
+		b.Bitboards[piece.Black|piece.Rook]:   "♜",
+		b.Bitboards[piece.Black|piece.Knight]: "♞",
+		b.Bitboards[piece.Black|piece.Bishop]: "♝",
+		b.Bitboards[piece.Black|piece.Queen]:  "♛",
+		b.Bitboards[piece.Black|piece.King]:   "♚",
 	}
 }
 

@@ -1,70 +1,70 @@
 package piece
 
-var ColorWhite uint = 0b01000
-var ColorBlack uint = 0b10000
+var White uint8 = 0b01000
+var Black uint8 = 0b10000
 
-var TypePawn uint = 0b00001
-var TypeRook uint = 0b00010
-var TypeKnight uint = 0b00011
-var TypeBishop uint = 0b00100
-var TypeQueen uint = 0b00101
-var TypeKing uint = 0b00110
+var Pawn uint8 = 0b00001
+var Rook uint8 = 0b00010
+var Knight uint8 = 0b00011
+var Bishop uint8 = 0b00100
+var Queen uint8 = 0b00101
+var King uint8 = 0b00110
 
-func Value(pieceChar rune) uint {
+func Value(pieceChar rune) uint8 {
 	switch pieceChar {
 	case 'r':
-		return ColorBlack | TypeRook
+		return Black | Rook
 	case 'n':
-		return ColorBlack | TypeKnight
+		return Black | Knight
 	case 'b':
-		return ColorBlack | TypeBishop
+		return Black | Bishop
 	case 'q':
-		return ColorBlack | TypeQueen
+		return Black | Queen
 	case 'k':
-		return ColorBlack | TypeKing
+		return Black | King
 	case 'p':
-		return ColorBlack | TypePawn
+		return Black | Pawn
 
 	case 'R':
-		return ColorWhite | TypeRook
+		return White | Rook
 	case 'N':
-		return ColorWhite | TypeKnight
+		return White | Knight
 	case 'B':
-		return ColorWhite | TypeBishop
+		return White | Bishop
 	case 'Q':
-		return ColorWhite | TypeQueen
+		return White | Queen
 	case 'K':
-		return ColorWhite | TypeKing
+		return White | King
 	case 'P':
-		return ColorWhite | TypePawn
+		return White | Pawn
 	default:
 		return 0
 	}
 }
 
-func ToString(pieceValue uint) string {
+func ToString(pieceValue uint8) string {
 	pieceType := pieceValue & 0b00111
 	color := pieceValue & 0b11000
 
 	var char rune
 	switch pieceType {
-	case TypePawn:
+	case Pawn:
 		char = 'p'
-	case TypeRook:
+	case Rook:
 		char = 'r'
-	case TypeKnight:
+	case Knight:
 		char = 'n'
-	case TypeBishop:
+	case Bishop:
 		char = 'b'
-	case TypeQueen:
+	case Queen:
 		char = 'q'
-	case TypeKing:
+	case King:
 		char = 'k'
 	default:
 		return ""
 	}
 
-	if color == ColorWhite {
+	if color == White {
 		return string(char - 32) // Convert to uppercase
 	}
 	return string(char)

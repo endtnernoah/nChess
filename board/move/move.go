@@ -12,7 +12,7 @@ type Move struct {
 	EnPassantCaptureSquare int
 	EnPassantPassedSquare  int
 	RookStartingSquare     int
-	PromotionPiece         uint
+	PromotionPiece         uint8
 }
 
 type OptionalParameter func(*Move)
@@ -35,7 +35,7 @@ func WithRookStartingSquare(square int) OptionalParameter {
 	}
 }
 
-func WithPromotion(promotionPiece uint) OptionalParameter {
+func WithPromotion(promotionPiece uint8) OptionalParameter {
 	return func(m *Move) {
 		m.PromotionPiece = promotionPiece
 	}

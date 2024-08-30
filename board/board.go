@@ -13,9 +13,9 @@ import (
 
 type State struct {
 	Bitboards []uint64
-	Pieces    []uint
+	Pieces    []uint8
 
-	CastlingAvailability  uint
+	CastlingAvailability  uint8
 	EnPassantTargetSquare int
 	HalfMoves             int
 	FullMoves             int
@@ -25,11 +25,11 @@ type Board struct {
 	// Bitboards are stored from bottom left to top right, meaning A1 to H8
 	// Bitboards are stored at the index of the piece they have
 	Bitboards []uint64
-	Pieces    []uint
+	Pieces    []uint8
 
 	// From fen
 	WhiteToMove           bool
-	CastlingAvailability  uint // Bits set like KQkq
+	CastlingAvailability  uint8 // Bits set like KQkq
 	EnPassantTargetSquare int
 	HalfMoves             int
 	FullMoves             int
@@ -49,7 +49,7 @@ func New(fenString string) *Board {
 	figurePositions := strings.Join(figurePositionRows, "/")
 
 	b.Bitboards = make([]uint64, 0b10111)
-	b.Pieces = make([]uint, 64)
+	b.Pieces = make([]uint8, 64)
 
 	// Setting up pieces
 	boardPosition := 0
@@ -212,7 +212,7 @@ func (b *Board) MakeMove(m move.Move) {
 	// Update the stack
 	s := State{}
 
-	s.Pieces = make([]uint, len(b.Pieces))
+	s.Pieces = make([]uint8, len(b.Pieces))
 	s.Bitboards = make([]uint64, len(b.Bitboards))
 
 	copy(s.Pieces, b.Pieces)
@@ -261,7 +261,7 @@ func (b *Board) MakeMove(m move.Move) {
 	// Increase half move if not a pawn move and not a capture
 	movedPieceType := b.Pieces[m.StartIndex] & 0b00111
 	targetPiece := b.Pieces[m.TargetIndex]
-	if movedPieceType == piece.TypePawn || targetPiece != 0 {
+	if movedPieceType == piece.Pawn || targetPiece != 0 {
 		b.HalfMoves = 0
 	} else {
 		b.HalfMoves += 1
