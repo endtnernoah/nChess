@@ -5,6 +5,7 @@ import (
 	"endtner.dev/nChess/board/move"
 	"endtner.dev/nChess/board/piece"
 	"fmt"
+	"math/bits"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,8 +28,18 @@ type Board struct {
 	Bitboards []uint64
 	Pieces    []uint8
 
-	// From fen
-	WhiteToMove           bool
+	// Current player
+	WhiteToMove       bool
+	FriendlyColor     uint8
+	OpponentColor     uint8
+	FriendlyIndex     int
+	OpponentIndex     int
+	FriendlyKingIndex int
+	OpponentKingIndex int
+	PawnOffset        int
+	PromotionRank     int
+
+	// Metadata
 	CastlingAvailability  uint8 // Bits set like KQkq
 	EnPassantTargetSquare int
 	HalfMoves             int
@@ -85,6 +96,24 @@ func New(fenString string) *Board {
 
 	// Checking who is to move
 	b.WhiteToMove = fenFields[1] == "w"
+
+	b.FriendlyColor = piece.White
+	b.OpponentColor = piece.Black
+
+	b.PawnOffset = 8
+	b.PromotionRank = 7
+
+	if !b.WhiteToMove {
+		b.FriendlyColor, b.OpponentColor = b.OpponentColor, b.FriendlyColor
+		b.PawnOffset = -8
+		b.PromotionRank = 0
+	}
+
+	b.FriendlyIndex = int((b.FriendlyColor >> 3) - 1)
+	b.OpponentIndex = 1 - b.FriendlyIndex
+
+	b.FriendlyKingIndex = bits.TrailingZeros64(b.Bitboards[b.FriendlyColor|piece.King])
+	b.OpponentKingIndex = bits.TrailingZeros64(b.Bitboards[b.OpponentColor|piece.King])
 
 	// Castling availability
 	castlingAvailabilityFlags := fenFields[2]
@@ -357,4 +386,16 @@ func (b *Board) UnmakeMove() {
 	b.OtherColorToMove()
 }
 
-func (b *Board) OtherColorToMove() { b.WhiteToMove = !b.WhiteToMove }
+func (b *Board) OtherColorToMove() {
+	b.WhiteToMove = !b.WhiteToMove
+
+	b.FriendlyColor, b.OpponentColor = b.OpponentColor, b.FriendlyColor
+	b.FriendlyIndex, b.OpponentIndex = b.OpponentIndex, b.FriendlyIndex
+
+	b.FriendlyKingIndex = bits.TrailingZeros64(b.Bitboards[b.FriendlyColor|piece.King])
+	b.OpponentKingIndex = bits.TrailingZeros64(b.Bitboards[b.OpponentColor|piece.King])
+
+	b.PawnOffset *= -1
+
+	b.PromotionRank = 7 - b.PromotionRank
+}

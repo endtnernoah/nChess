@@ -4,36 +4,30 @@ import (
 	"endtner.dev/nChess/board"
 	"endtner.dev/nChess/board/boardhelper"
 	"endtner.dev/nChess/board/piece"
-	"math/bits"
 )
 
 var Pins = make([]uint64, 2)
 
-func ComputePins(b *board.Board, color uint8) {
-	straightPinnedPieces := StraightPins(b, color)
-	diagonalPinnedPieces := DiagonalPins(b, color)
+func ComputePins(b *board.Board) {
+	straightPinnedPieces := OrthogonalPins(b)
+	diagonalPinnedPieces := DiagonalPins(b)
 
-	Pins[(color>>3)-1] = straightPinnedPieces | diagonalPinnedPieces
+	Pins[b.FriendlyIndex] = straightPinnedPieces | diagonalPinnedPieces
 }
 
 /*
 	Generators
 */
 
-func StraightPins(b *board.Board, friendlyColor uint8) uint64 {
+func OrthogonalPins(b *board.Board) uint64 {
 	var pinMask uint64
 
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
+	friendlyKingIndex := b.FriendlyKingIndex
 
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	opponentPiecesMask := Occupancy[b.OpponentIndex]
 
-	opponentColor := piece.White
-	if friendlyColor == piece.White {
-		opponentColor = piece.Black
-	}
-
-	opponentAttackers := b.Bitboards[opponentColor|piece.Rook] | b.Bitboards[opponentColor|piece.Queen]
+	opponentAttackers := b.Bitboards[b.OpponentColor|piece.Rook] | b.Bitboards[b.OpponentColor|piece.Queen]
 	otherOpponentPiecesMask := opponentPiecesMask & ^opponentAttackers
 
 	for i, offset := range DirectionalOffsets[:4] {
@@ -84,19 +78,14 @@ func StraightPins(b *board.Board, friendlyColor uint8) uint64 {
 	return pinMask
 }
 
-func DiagonalPins(b *board.Board, friendlyColor uint8) uint64 {
+func DiagonalPins(b *board.Board) uint64 {
 	var pinMask uint64
 
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
+	friendlyKingIndex := b.FriendlyKingIndex
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	opponentPiecesMask := Occupancy[b.OpponentIndex]
 
-	opponentColor := piece.White
-	if friendlyColor == piece.White {
-		opponentColor = piece.Black
-	}
-
-	opponentAttackers := b.Bitboards[opponentColor|piece.Bishop] | b.Bitboards[opponentColor|piece.Queen]
+	opponentAttackers := b.Bitboards[b.OpponentColor|piece.Bishop] | b.Bitboards[b.OpponentColor|piece.Queen]
 	otherOpponentPiecesMask := opponentPiecesMask & ^opponentAttackers
 
 	for i, offset := range DirectionalOffsets[4:] {

@@ -35,103 +35,75 @@ func ComputeAll(b *board.Board) {
 	Occupancy[1] = blackPieces
 	Occupancy[2] = whitePieces | blackPieces
 
-	ComputeAttacks(b, piece.White)
-	ComputeAttacks(b, piece.Black)
-	ComputePins(b, piece.White)
-	ComputePins(b, piece.Black)
+	ComputeAttacks(b)
+	ComputePins(b)
 }
 
 /*
 	Generators
 */
 
-func PseudoLegalMoves(b *board.Board) []move.Move {
-	/*
-		Creating pseudo-legal moves in an iterative approach. This function is used in the actual implementation.
-	*/
-
-	pseudoLegalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
-
-	friendlyColor := piece.White
-
-	if !b.WhiteToMove {
-		friendlyColor = piece.Black
-	}
-
-	pseudoLegalMoves = append(pseudoLegalMoves, PawnMoves(b, friendlyColor, b.EnPassantTargetSquare)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, SlidingMoves(b, friendlyColor)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, KnightMoves(b, friendlyColor)...)
-	pseudoLegalMoves = append(pseudoLegalMoves, KingMoves(b, friendlyColor, b.CastlingAvailability)...)
-
-	return pseudoLegalMoves
-}
-
 func LegalMoves(b *board.Board) []move.Move {
 	/*
-		Filtering out all illegal moves
+		Creating pseudo-legal moves in an iterative approach, then filtering out illegal moves
 	*/
 
-	// Precompute attacks, pins
+	// Precompute occupancy, enemy attacks & own pins
 	ComputeAll(b)
 
-	legalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
+	pseudoLegalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
+	KingMoves(b, &pseudoLegalMoves)
 
-	pseudoLegalMoves := PseudoLegalMoves(b)
+	friendlyKingIndex := b.FriendlyKingIndex
 
-	friendlyColor := piece.White
-
-	if !b.WhiteToMove {
-		friendlyColor = piece.Black
-	}
-
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
-
-	opponentAttackMask := Attacks[1-((friendlyColor>>3)-1)]
-	friendlyPinMask := Pins[(friendlyColor>>3)-1]
+	opponentAttackMask := Attacks[b.OpponentIndex]
+	friendlyPinMask := Pins[b.FriendlyIndex]
 
 	checkCount := 0
 	protectMoveMask := ^uint64(0)
 
 	if boardhelper.IsIndexBitSet(friendlyKingIndex, opponentAttackMask) {
-		checkCount, protectMoveMask = CheckMask(b, friendlyColor)
+		checkCount, protectMoveMask = CheckMask(b)
 	}
+
+	// Can directly return king moves if we are in multi check
+	if checkCount > 1 {
+		return pseudoLegalMoves
+	}
+
+	PawnMoves(b, &pseudoLegalMoves)
+	SlidingMoves(b, &pseudoLegalMoves)
+	KnightMoves(b, &pseudoLegalMoves)
+
+	legalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
 
 	for _, m := range pseudoLegalMoves {
 
 		// Only move along pin ray if piece is pinned
-		if boardhelper.IsIndexBitSet(m.StartIndex, friendlyPinMask) && !IsPinnedMoveAlongRay(b, friendlyColor, m) {
+		if boardhelper.IsIndexBitSet(m.StartIndex, friendlyPinMask) && !boardhelper.IsIndexBitSet(m.TargetIndex, calculatePinRay(b, m.StartIndex)) {
 			continue
 		}
 
-		// If the king is in check
-		if checkCount > 0 {
+		// King is in single check
+		if checkCount == 1 {
 
-			// King is in single check
-			if checkCount == 1 {
+			// If a move is not to any of the protect square OR not a king move
+			if !boardhelper.IsIndexBitSet(m.TargetIndex, protectMoveMask) && (friendlyKingIndex != m.StartIndex) {
 
-				// If a move is not to any of the protect square OR not a king move
-				if !boardhelper.IsIndexBitSet(m.TargetIndex, protectMoveMask) && (friendlyKingIndex != m.StartIndex) {
-
-					// Move can not enPassantCapture the checking pawn, not allowed
-					if m.EnPassantCaptureSquare == -1 {
-						continue
-					}
-
-					// Move CAN capture enPassant, but not the attacking pawn, not allowed
-					if m.EnPassantCaptureSquare != -1 && !boardhelper.IsIndexBitSet(m.EnPassantCaptureSquare, protectMoveMask) {
-						continue
-					}
+				// Move can not enPassantCapture the checking pawn, not allowed
+				if m.EnPassantCaptureSquare == -1 {
+					continue
 				}
-			}
 
-			// If the king is in double (or higher) check, only allow king moves
-			if checkCount > 1 && friendlyKingIndex != m.StartIndex {
-				continue
+				// Move CAN capture enPassant, but not the attacking pawn, not allowed
+				if m.EnPassantCaptureSquare != -1 && !boardhelper.IsIndexBitSet(m.EnPassantCaptureSquare, protectMoveMask) {
+					continue
+				}
 			}
 		}
 
 		// If we do an enPassant Capture, make sure it does not leave our own king in check
-		if m.EnPassantCaptureSquare != -1 && IsEnPassantMovePinned(b, friendlyColor, m) {
+		if m.EnPassantCaptureSquare != -1 && IsEnPassantMovePinned(b, m) {
 			continue
 		}
 
@@ -145,31 +117,22 @@ func LegalMoves(b *board.Board) []move.Move {
 	Valid move squares
 */
 
-func CheckMask(b *board.Board, friendlyColor uint8) (int, uint64) {
+func CheckMask(b *board.Board) (int, uint64) {
 	checkCnt := 0
 	var validMoveMask uint64
 
-	opponentColor := piece.Black
-	if friendlyColor == piece.Black {
-		opponentColor = piece.White
-	}
+	indexOffsetsPawns := []int{b.PawnOffset - 1, b.PawnOffset + 1}
 
-	indexOffsetsPawns := []int{7, 9}
+	friendlyKingIndex := b.FriendlyKingIndex
 
-	if friendlyColor == piece.Black {
-		indexOffsetsPawns = []int{-7, -9}
-	}
-
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
-
-	opponentOrthogonalAttackers := b.Bitboards[opponentColor|piece.Rook] | b.Bitboards[opponentColor|piece.Queen]
-	opponentDiagonalAttackers := b.Bitboards[opponentColor|piece.Bishop] | b.Bitboards[opponentColor|piece.Queen]
-	enemyPawns := b.Bitboards[opponentColor|piece.Pawn]
+	opponentOrthogonalAttackers := b.Bitboards[b.OpponentColor|piece.Rook] | b.Bitboards[b.OpponentColor|piece.Queen]
+	opponentDiagonalAttackers := b.Bitboards[b.OpponentColor|piece.Bishop] | b.Bitboards[b.OpponentColor|piece.Queen]
+	enemyPawns := b.Bitboards[b.OpponentColor|piece.Pawn]
 
 	orthogonalOtherPiecesMask := Occupancy[2] & ^opponentOrthogonalAttackers
 	diagonalOtherPiecesMask := Occupancy[2] & ^opponentDiagonalAttackers
 
-	knightAttackMask := ComputedKnightMoves[friendlyKingIndex] & b.Bitboards[opponentColor|piece.Knight]
+	knightAttackMask := ComputedKnightMoves[friendlyKingIndex] & b.Bitboards[b.OpponentColor|piece.Knight]
 
 	for i, offset := range DirectionalOffsets[:4] {
 		var mask uint64
@@ -240,18 +203,18 @@ func CheckMask(b *board.Board, friendlyColor uint8) (int, uint64) {
 	return checkCnt, validMoveMask
 }
 
-func IsPinnedMoveAlongRay(b *board.Board, friendlyColor uint8, m move.Move) bool {
+func calculatePinRay(b *board.Board, pieceIndex int) uint64 {
 	var pinRay uint64
 
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
-	opponentPieceMask := Occupancy[1-((friendlyColor>>3)-1)]
+	friendlyKingIndex := b.FriendlyKingIndex
+	opponentPieceMask := Occupancy[b.OpponentIndex]
 
-	offset := boardhelper.CalculateRayOffset(friendlyKingIndex, m.StartIndex)
+	offset := boardhelper.CalculateRayOffset(friendlyKingIndex, pieceIndex)
 	step := friendlyKingIndex + offset
 
 	for boardhelper.IsValidStraightMove(friendlyKingIndex, step) || boardhelper.IsValidDiagonalMove(friendlyKingIndex, step) {
 		// Cannot move to our own square
-		if step != m.StartIndex {
+		if step != pieceIndex {
 			pinRay |= 1 << step
 		}
 
@@ -263,17 +226,12 @@ func IsPinnedMoveAlongRay(b *board.Board, friendlyColor uint8, m move.Move) bool
 		step += offset
 	}
 
-	return boardhelper.IsIndexBitSet(m.TargetIndex, pinRay)
+	return pinRay
 }
 
-func IsEnPassantMovePinned(b *board.Board, friendlyColor uint8, m move.Move) bool {
+func IsEnPassantMovePinned(b *board.Board, m move.Move) bool {
 
-	opponentColor := piece.Black
-	if friendlyColor != piece.White {
-		opponentColor = piece.White
-	}
-
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
+	friendlyKingIndex := b.FriendlyKingIndex
 
 	// Can instantly return if there is no direct ray between friendlyKingIndex & enPassantCaptureSquare
 	offset := boardhelper.CalculateRayOffset(friendlyKingIndex, m.EnPassantCaptureSquare)
@@ -281,13 +239,13 @@ func IsEnPassantMovePinned(b *board.Board, friendlyColor uint8, m move.Move) boo
 		return false
 	}
 
-	enemyAttackers := b.Bitboards[opponentColor|piece.Queen]
+	enemyAttackers := b.Bitboards[b.OpponentColor|piece.Queen]
 	isValidMoveFunction := boardhelper.IsValidStraightMove
 	switch offset {
 	case -1, 1, -8, 8:
-		enemyAttackers |= b.Bitboards[opponentColor|piece.Rook]
+		enemyAttackers |= b.Bitboards[b.OpponentColor|piece.Rook]
 	case -7, 7, -9, 9:
-		enemyAttackers |= b.Bitboards[opponentColor|piece.Bishop]
+		enemyAttackers |= b.Bitboards[b.OpponentColor|piece.Bishop]
 		isValidMoveFunction = boardhelper.IsValidDiagonalMove
 	default:
 		return false

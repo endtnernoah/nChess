@@ -9,31 +9,23 @@ import (
 
 var Attacks = make([]uint64, 2)
 
-func ComputeAttacks(b *board.Board, color uint8) {
-	pawnAttacks := PawnAttacks(b, color)
-	straightSlidingAttacks := StraightSlidingAttacks(b, color)
-	diagonalSlidingAttacks := DiagonalSlidingAttacks(b, color)
-	knightAttacks := KnightAttacks(b, color)
-
-	Attacks[(color>>3)-1] = pawnAttacks |
-		straightSlidingAttacks |
-		diagonalSlidingAttacks |
-		knightAttacks
+func ComputeAttacks(b *board.Board) {
+	Attacks[b.OpponentIndex] = PawnAttacks(b) |
+		SlidingAttacks(b) |
+		KnightAttacks(b) |
+		ComputedKingMoves[b.OpponentKingIndex]
 }
 
 /*
 	Generators
 */
 
-func PawnAttacks(b *board.Board, friendlyColor uint8) uint64 {
+func PawnAttacks(b *board.Board) uint64 {
 	var attacks uint64
 
-	offset := 8
-	if friendlyColor != piece.White {
-		offset = -8
-	}
+	offset := b.PawnOffset * -1
 
-	pieces := b.Bitboards[friendlyColor|piece.Pawn]
+	pieces := b.Bitboards[b.OpponentColor|piece.Pawn]
 	for pieces != 0 {
 		pieceIndex := bits.TrailingZeros64(pieces)
 
@@ -54,27 +46,34 @@ func PawnAttacks(b *board.Board, friendlyColor uint8) uint64 {
 	return attacks
 }
 
-func StraightSlidingAttacks(b *board.Board, friendlyColor uint8) uint64 {
+func SlidingAttacks(b *board.Board) uint64 {
 	var attacks uint64
 
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
+	friendlyPiecesMask := Occupancy[b.OpponentIndex]
+	opponentPiecesMask := Occupancy[b.FriendlyIndex]
 
-	opponentColor := piece.Black
-	if friendlyColor != piece.White {
-		opponentColor = piece.White
-	}
-	opponentKingIndex := bits.TrailingZeros64(b.Bitboards[opponentColor|piece.King])
+	opponentKingIndex := b.FriendlyKingIndex
 
-	pieces := b.Bitboards[friendlyColor|piece.Rook] | b.Bitboards[friendlyColor|piece.Queen] | b.Bitboards[friendlyColor|piece.King]
+	pieces := b.Bitboards[b.OpponentColor|piece.Rook] | b.Bitboards[b.OpponentColor|piece.Bishop] | b.Bitboards[b.OpponentColor|piece.Queen]
 	for pieces != 0 {
 		pieceIndex := bits.TrailingZeros64(pieces)
+		pieceType := b.Pieces[pieceIndex] & 0b00111
 
-		for i, offset := range DirectionalOffsets[:4] {
+		offsetIndexStart := 0
+		offsetIndexEnd := 8
+
+		if pieceType == piece.Rook {
+			offsetIndexEnd = 4
+		}
+		if pieceType == piece.Bishop {
+			offsetIndexStart = 4
+		}
+
+		for i, offset := range DirectionalOffsets[offsetIndexStart:offsetIndexEnd] {
 			targetIndex := pieceIndex + offset
 
 			depth := 1
-			for depth <= DistanceToEdge[pieceIndex][i] {
+			for depth <= DistanceToEdge[pieceIndex][i+offsetIndexStart] {
 
 				attacks |= 1 << targetIndex
 
@@ -88,11 +87,6 @@ func StraightSlidingAttacks(b *board.Board, friendlyColor uint8) uint64 {
 					break
 				}
 
-				// If we are a king, we break
-				if (b.Pieces[pieceIndex] & 0b00111) == piece.King {
-					break
-				}
-
 				targetIndex += offset
 				depth++
 			}
@@ -105,61 +99,10 @@ func StraightSlidingAttacks(b *board.Board, friendlyColor uint8) uint64 {
 	return attacks
 }
 
-func DiagonalSlidingAttacks(b *board.Board, friendlyColor uint8) uint64 {
+func KnightAttacks(b *board.Board) uint64 {
 	var attacks uint64
 
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
-
-	opponentColor := piece.Black
-	if friendlyColor != piece.White {
-		opponentColor = piece.White
-	}
-	enemyKingIndex := bits.TrailingZeros64(b.Bitboards[opponentColor|piece.King])
-
-	pieces := b.Bitboards[friendlyColor|piece.Bishop] | b.Bitboards[friendlyColor|piece.Queen] | b.Bitboards[friendlyColor|piece.King]
-	for pieces != 0 {
-		pieceIndex := bits.TrailingZeros64(pieces)
-
-		for i, offset := range DirectionalOffsets[4:] {
-			targetIndex := pieceIndex + offset
-
-			depth := 1
-			for depth <= DistanceToEdge[pieceIndex][i+4] {
-
-				attacks |= 1 << targetIndex
-
-				// If we hit our own piece, we break
-				if boardhelper.IsIndexBitSet(targetIndex, friendlyPiecesMask) {
-					break
-				}
-
-				// If we hit an enemy piece except the enemy king, we break
-				if boardhelper.IsIndexBitSet(targetIndex, opponentPiecesMask) && (targetIndex != enemyKingIndex) {
-					break
-				}
-
-				// If we are a king, we break
-				if (b.Pieces[pieceIndex] & 0b00111) == piece.King {
-					break
-				}
-
-				targetIndex += offset
-				depth++
-			}
-
-		}
-
-		pieces &= pieces - 1
-	}
-
-	return attacks
-}
-
-func KnightAttacks(b *board.Board, friendlyColor uint8) uint64 {
-	var attacks uint64
-
-	knights := b.Bitboards[friendlyColor|piece.Knight]
+	knights := b.Bitboards[b.OpponentColor|piece.Knight]
 	for knights != 0 {
 		attacks |= ComputedKnightMoves[bits.TrailingZeros64(knights)]
 		knights &= knights - 1

@@ -1,7 +1,7 @@
 package t
 
 import (
-	"endtner.dev/nChess/board/move"
+	"endtner.dev/nChess/board"
 	"endtner.dev/nChess/movegenerator"
 	"fmt"
 	"strings"
@@ -16,7 +16,7 @@ import (
 func doPerftTest(positionName string, positionFen string, expectedPerftResults []int64) bool {
 	testingResult := true
 
-	b := move.New(positionFen)
+	b := board.New(positionFen)
 
 	resultString := strings.Builder{}
 

@@ -11,10 +11,8 @@ import (
 var DirectionalOffsets = []int{8, -8, -1, 1, 7, -7, 9, -9}
 var KnightOffsets = []int{-6, 6, -10, 10, -15, 15, -17, 17}
 
-var DistanceToEdge = computeDistanceToEdges()
-
-func computeDistanceToEdges() [][]int {
-	precomputedDistances := make([][]int, 64)
+var DistanceToEdge = func() [][]int {
+	distances := make([][]int, 64)
 
 	for file := 0; file < 8; file++ {
 		for rank := 0; rank < 8; rank++ {
@@ -25,7 +23,7 @@ func computeDistanceToEdges() [][]int {
 
 			squareIndex := rank*8 + file
 
-			precomputedDistances[squareIndex] = []int{
+			distances[squareIndex] = []int{
 				numNorth,
 				numSouth,
 				numWest,
@@ -38,56 +36,51 @@ func computeDistanceToEdges() [][]int {
 		}
 	}
 
-	return precomputedDistances
-}
+	return distances
+}()
 
-var ComputedKnightMoves = computeKnightMoves()
-
-func computeKnightMoves() []uint64 {
-	var knightMoves = make([]uint64, 64)
+var ComputedKnightMoves = func() []uint64 {
+	moves := make([]uint64, 64)
 
 	for startIndex := range 64 {
-		var validMoves uint64
-
 		for _, offset := range KnightOffsets {
 			targetIndex := startIndex + offset
-
 			if boardhelper.IsValidKnightMove(startIndex, targetIndex) {
-				validMoves |= 1 << targetIndex
+				moves[startIndex] |= 1 << targetIndex
 			}
 		}
-
-		knightMoves[startIndex] = validMoves
 	}
 
-	return knightMoves
-}
+	return moves
+}()
+
+var ComputedKingMoves = func() []uint64 {
+	moves := make([]uint64, 64)
+
+	for startIndex := range 64 {
+		for i, offset := range DirectionalOffsets {
+			if DistanceToEdge[startIndex][i] != 0 {
+				moves[startIndex] |= 1 << (startIndex + offset)
+			}
+		}
+	}
+
+	return moves
+}()
 
 /*
 	Generators
 */
 
-func PawnMoves(b *board.Board, friendlyColor uint8, enPassantTargetSquare int) []move.Move {
-	var moves []move.Move
-
-	// Default offset for white
-	offset := 8
-	promotionRank := 7
-
-	// Change offset for black
-	if friendlyColor != piece.White {
-		offset = -8
-		promotionRank = 0
-	}
-
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
+func PawnMoves(b *board.Board, moves *[]move.Move) {
+	opponentPiecesMask := Occupancy[b.OpponentIndex]
 	allPiecesMask := Occupancy[2]
 
-	pieces := b.Bitboards[friendlyColor|piece.Pawn]
+	pieces := b.Bitboards[b.FriendlyColor|piece.Pawn]
 	for pieces != 0 {
 		// Get index of LSB
 		pieceIndex := bits.TrailingZeros64(pieces)
-		targetIndex := pieceIndex + offset
+		targetIndex := pieceIndex + b.PawnOffset
 
 		// Continue if target index is out of bounds, just go to the next iteration
 		if targetIndex < 0 || targetIndex > 63 {
@@ -95,32 +88,33 @@ func PawnMoves(b *board.Board, friendlyColor uint8, enPassantTargetSquare int) [
 			continue
 		}
 
-		promotionFlag := targetIndex/8 == promotionRank
+		promotionFlag := targetIndex/8 == b.PromotionRank
 
 		// Add move if target square is empty
 		if !boardhelper.IsIndexBitSet(targetIndex, allPiecesMask) {
 			// Add all promotion moves
 			if promotionFlag {
-				moves = append(moves, move.New(pieceIndex, targetIndex, move.WithPromotion(friendlyColor|piece.Knight)))
-				moves = append(moves, move.New(pieceIndex, targetIndex, move.WithPromotion(friendlyColor|piece.Bishop)))
-				moves = append(moves, move.New(pieceIndex, targetIndex, move.WithPromotion(friendlyColor|piece.Queen)))
-				moves = append(moves, move.New(pieceIndex, targetIndex, move.WithPromotion(friendlyColor|piece.Rook)))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Knight)))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Queen)))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Rook)))
 			} else {
-				moves = append(moves, move.New(pieceIndex, targetIndex))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex))
 			}
 		}
 
 		// Check if the pawn is on starting square
 		isStartingSquare := pieceIndex >= 8 && pieceIndex < 16
-		if friendlyColor != piece.White {
+		if !b.WhiteToMove {
 			isStartingSquare = pieceIndex >= 48 && pieceIndex < 56
 		}
 
 		// Can move 2 rows from starting square
 		if isStartingSquare {
+			epTargetIndex := targetIndex + b.PawnOffset
 			if !boardhelper.IsIndexBitSet(targetIndex, allPiecesMask) &&
-				!boardhelper.IsIndexBitSet(targetIndex+offset, allPiecesMask) {
-				moves = append(moves, move.New(pieceIndex, targetIndex+offset, move.WithEnPassantPassedSquare(targetIndex)))
+				!boardhelper.IsIndexBitSet(epTargetIndex, allPiecesMask) {
+				*moves = append(*moves, move.New(pieceIndex, epTargetIndex, move.WithEnPassantPassedSquare(targetIndex)))
 			}
 		}
 
@@ -131,47 +125,43 @@ func PawnMoves(b *board.Board, friendlyColor uint8, enPassantTargetSquare int) [
 		// Add move if it is in the same target row and targets are not empty
 		if boardhelper.IsValidDiagonalMove(pieceIndex, side1) && boardhelper.IsIndexBitSet(side1, opponentPiecesMask) {
 			if promotionFlag {
-				moves = append(moves, move.New(pieceIndex, side1, move.WithPromotion(friendlyColor|piece.Knight)))
-				moves = append(moves, move.New(pieceIndex, side1, move.WithPromotion(friendlyColor|piece.Bishop)))
-				moves = append(moves, move.New(pieceIndex, side1, move.WithPromotion(friendlyColor|piece.Queen)))
-				moves = append(moves, move.New(pieceIndex, side1, move.WithPromotion(friendlyColor|piece.Rook)))
+				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Knight)))
+				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
+				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Queen)))
+				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Rook)))
 			} else {
-				moves = append(moves, move.New(pieceIndex, side1))
+				*moves = append(*moves, move.New(pieceIndex, side1))
 			}
 		}
 		if boardhelper.IsValidDiagonalMove(pieceIndex, side2) && boardhelper.IsIndexBitSet(side2, opponentPiecesMask) {
 			if promotionFlag {
-				moves = append(moves, move.New(pieceIndex, side2, move.WithPromotion(friendlyColor|piece.Knight)))
-				moves = append(moves, move.New(pieceIndex, side2, move.WithPromotion(friendlyColor|piece.Bishop)))
-				moves = append(moves, move.New(pieceIndex, side2, move.WithPromotion(friendlyColor|piece.Queen)))
-				moves = append(moves, move.New(pieceIndex, side2, move.WithPromotion(friendlyColor|piece.Rook)))
+				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Knight)))
+				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
+				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Queen)))
+				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Rook)))
 			} else {
-				moves = append(moves, move.New(pieceIndex, side2))
+				*moves = append(*moves, move.New(pieceIndex, side2))
 			}
 		}
 
 		// Add move if either side can capture en passant
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side1) && side1 == enPassantTargetSquare {
-			moves = append(moves, move.New(pieceIndex, side1, move.WithEnPassantCaptureSquare(side1-offset)))
+		if boardhelper.IsValidDiagonalMove(pieceIndex, side1) && side1 == b.EnPassantTargetSquare {
+			*moves = append(*moves, move.New(pieceIndex, side1, move.WithEnPassantCaptureSquare(side1-b.PawnOffset)))
 		}
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side2) && side2 == enPassantTargetSquare {
-			moves = append(moves, move.New(pieceIndex, side2, move.WithEnPassantCaptureSquare(side2-offset)))
+		if boardhelper.IsValidDiagonalMove(pieceIndex, side2) && side2 == b.EnPassantTargetSquare {
+			*moves = append(*moves, move.New(pieceIndex, side2, move.WithEnPassantCaptureSquare(side2-b.PawnOffset)))
 		}
 
 		// Remove LSB of bitboard
 		pieces &= pieces - 1
 	}
-
-	return moves
 }
 
-func SlidingMoves(b *board.Board, friendlyColor uint8) []move.Move {
-	var moves []move.Move
+func SlidingMoves(b *board.Board, moves *[]move.Move) {
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	opponentPiecesMask := Occupancy[b.OpponentIndex]
 
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentPiecesMask := Occupancy[1-((friendlyColor>>3)-1)]
-
-	pieces := b.Bitboards[friendlyColor|piece.Rook] | b.Bitboards[friendlyColor|piece.Bishop] | b.Bitboards[friendlyColor|piece.Queen]
+	pieces := b.Bitboards[b.FriendlyColor|piece.Rook] | b.Bitboards[b.FriendlyColor|piece.Bishop] | b.Bitboards[b.FriendlyColor|piece.Queen]
 	for pieces != 0 {
 		pieceIndex := bits.TrailingZeros64(pieces)
 		pieceType := b.Pieces[pieceIndex] & 0b00111
@@ -196,7 +186,7 @@ func SlidingMoves(b *board.Board, friendlyColor uint8) []move.Move {
 					break
 				}
 
-				moves = append(moves, move.New(pieceIndex, targetIndex))
+				*moves = append(*moves, move.New(pieceIndex, targetIndex))
 
 				// Break if we captured an enemy
 				if boardhelper.IsIndexBitSet(targetIndex, opponentPiecesMask) {
@@ -210,69 +200,52 @@ func SlidingMoves(b *board.Board, friendlyColor uint8) []move.Move {
 
 		pieces &= pieces - 1
 	}
-
-	return moves
 }
 
-func KnightMoves(b *board.Board, friendlyColor uint8) []move.Move {
-	var moves []move.Move
+func KnightMoves(b *board.Board, moves *[]move.Move) {
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
 
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-
-	knights := b.Bitboards[friendlyColor|piece.Knight]
+	knights := b.Bitboards[b.FriendlyColor|piece.Knight] & ^Pins[b.FriendlyIndex] // Knights cannot move if pinned
 	for knights != 0 {
-		startIndex := bits.TrailingZeros64(knights)
-		validMoveMask := ComputedKnightMoves[startIndex] & ^friendlyPiecesMask
+		pieceIndex := bits.TrailingZeros64(knights)
+
+		validMoveMask := ComputedKnightMoves[pieceIndex] & ^friendlyPiecesMask
 
 		for validMoveMask != 0 {
-			moves = append(moves, move.New(startIndex, bits.TrailingZeros64(validMoveMask)))
+			*moves = append(*moves, move.New(pieceIndex, bits.TrailingZeros64(validMoveMask)))
 			validMoveMask &= validMoveMask - 1
 		}
 
 		knights &= knights - 1
 	}
-
-	return moves
 }
 
-func KingMoves(b *board.Board, friendlyColor uint8, castlingAvailability uint8) []move.Move {
-	var moves []move.Move
-
-	friendlyKingIndex := bits.TrailingZeros64(b.Bitboards[friendlyColor|piece.King])
-	friendlyRooks := b.Bitboards[friendlyColor|piece.Rook]
+func KingMoves(b *board.Board, moves *[]move.Move) {
+	friendlyKingIndex := b.FriendlyKingIndex
+	friendlyRooks := b.Bitboards[b.FriendlyColor|piece.Rook]
 
 	allPiecesMask := Occupancy[2]
-	friendlyPiecesMask := Occupancy[(friendlyColor>>3)-1]
-	opponentAttackMask := Attacks[1-((friendlyColor>>3)-1)]
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	opponentAttackMask := Attacks[b.OpponentIndex]
 
-	for i, offset := range DirectionalOffsets {
-		targetIndex := friendlyKingIndex + offset
-
-		if targetIndex < 0 || targetIndex > 63 {
-			continue
-		}
-
-		if DistanceToEdge[friendlyKingIndex][i] == 0 ||
-			boardhelper.IsIndexBitSet(targetIndex, friendlyPiecesMask) ||
-			boardhelper.IsIndexBitSet(targetIndex, opponentAttackMask) {
-			continue
-		}
-
-		moves = append(moves, move.New(friendlyKingIndex, targetIndex))
+	kingMoveMask := ComputedKingMoves[friendlyKingIndex] & ^friendlyPiecesMask & ^opponentAttackMask
+	for kingMoveMask != 0 {
+		*moves = append(*moves, move.New(friendlyKingIndex, bits.TrailingZeros64(kingMoveMask)))
+		kingMoveMask &= kingMoveMask - 1
 	}
 
 	initialKingIndex := 4
-	if friendlyColor != piece.White {
+	if !b.WhiteToMove {
 		initialKingIndex = 60
 	}
 
 	// King is not on its original square, will not be allowed to castle
 	if friendlyKingIndex != initialKingIndex {
-		return moves
+		return
 	}
 
-	kingSideAllowed := castlingAvailability&0b1000 != 0
-	queenSideAllowed := castlingAvailability&0b0100 != 0
+	kingSideAllowed := b.CastlingAvailability&0b1000 != 0
+	queenSideAllowed := b.CastlingAvailability&0b0100 != 0
 
 	var kingSideEmptyMask uint64 = 0b1100000
 	var queenSideEmptyMask uint64 = 0b1110
@@ -283,9 +256,9 @@ func KingMoves(b *board.Board, friendlyColor uint8, castlingAvailability uint8) 
 	var kingSideAttackMask uint64 = 1<<friendlyKingIndex | 1<<(friendlyKingIndex+1) | 1<<(friendlyKingIndex+2)
 	var queenSideAttackMask uint64 = 1<<friendlyKingIndex | 1<<(friendlyKingIndex-1) | 1<<(friendlyKingIndex-2)
 
-	if friendlyColor != piece.White {
-		kingSideAllowed = castlingAvailability&0b0010 != 0
-		queenSideAllowed = castlingAvailability&0b0001 != 0
+	if !b.WhiteToMove {
+		kingSideAllowed = b.CastlingAvailability&0b0010 != 0
+		queenSideAllowed = b.CastlingAvailability&0b0001 != 0
 
 		kingSideEmptyMask <<= 56
 		queenSideEmptyMask <<= 56
@@ -298,17 +271,15 @@ func KingMoves(b *board.Board, friendlyColor uint8, castlingAvailability uint8) 
 		(kingSideAttackMask&opponentAttackMask) == 0 && // King does not start or pass through attacked field
 		(kingSideEmptyMask&allPiecesMask) == 0 && // All fields are empty
 		boardhelper.IsIndexBitSet(kingSideRookIndex, friendlyRooks) { // There is a rook on its field
-		moves = append(moves, move.New(friendlyKingIndex, friendlyKingIndex+2, move.WithRookStartingSquare(kingSideRookIndex)))
+		*moves = append(*moves, move.New(friendlyKingIndex, friendlyKingIndex+2, move.WithRookStartingSquare(kingSideRookIndex)))
 	}
 
 	if queenSideAllowed &&
 		(queenSideAttackMask&opponentAttackMask) == 0 &&
 		(queenSideEmptyMask&allPiecesMask) == 0 &&
 		boardhelper.IsIndexBitSet(queenSideRookIndex, friendlyRooks) {
-		moves = append(moves, move.New(friendlyKingIndex, friendlyKingIndex-2, move.WithRookStartingSquare(queenSideRookIndex)))
+		*moves = append(*moves, move.New(friendlyKingIndex, friendlyKingIndex-2, move.WithRookStartingSquare(queenSideRookIndex)))
 	}
-
-	return moves
 }
 
 /*
