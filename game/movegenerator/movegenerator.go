@@ -48,6 +48,28 @@ func computeDistanceToEdges() [][]int {
 	return precomputedDistances
 }
 
+var ComputedKnightMoves = computeKnightMoves()
+
+func computeKnightMoves() []uint64 {
+	var knightMoves = make([]uint64, 64)
+
+	for startIndex := range 64 {
+		var validMoves uint64
+
+		for _, offset := range KnightOffsets {
+			targetIndex := startIndex + offset
+
+			if boardhelper.IsValidKnightMove(startIndex, targetIndex) {
+				validMoves |= 1 << targetIndex
+			}
+		}
+
+		knightMoves[startIndex] = validMoves
+	}
+
+	return knightMoves
+}
+
 // ComputedAttacks & ComputedPins can be accessed at index (3 >> color) - 1 & 1 - accessIndex for enemy color
 var ComputedAttacks = make([]uint64, 2)
 var ComputedPins = make([]uint64, 2)
@@ -296,30 +318,24 @@ func DiagonalSlidingMoves(b *board.Board, pieceColor uint) []move.Move {
 }
 
 func KnightMoves(b *board.Board, pieceColor uint) []move.Move {
-	var knightMoves []move.Move
+	var validMoves []move.Move
 
 	ownOccupiedFields := b.OccupancyBitboards[(pieceColor>>3)-1]
 
-	piecesBitboard := b.Bitboards[pieceColor|piece.TypeKnight]
-	for piecesBitboard != 0 {
-		// Get index of LSB
-		startIndex := bits.TrailingZeros64(piecesBitboard)
+	knights := b.Bitboards[pieceColor|piece.TypeKnight]
+	for knights != 0 {
+		startIndex := bits.TrailingZeros64(knights)
+		validMoveMask := ComputedKnightMoves[startIndex] & ^ownOccupiedFields
 
-		for _, offset := range KnightOffsets {
-			targetIndex := startIndex + offset
-
-			if !boardhelper.IsValidKnightMove(startIndex, targetIndex) ||
-				boardhelper.IsIndexBitSet(targetIndex, ownOccupiedFields) {
-				continue
-			}
-
-			knightMoves = append(knightMoves, move.New(startIndex, targetIndex))
+		for validMoveMask != 0 {
+			validMoves = append(validMoves, move.New(startIndex, bits.TrailingZeros64(validMoveMask)))
+			validMoveMask &= validMoveMask - 1
 		}
 
-		piecesBitboard &= piecesBitboard - 1
+		knights &= knights - 1
 	}
 
-	return knightMoves
+	return validMoves
 }
 
 func KingMoves(b *board.Board, pieceColor uint, castlingAvailability uint) []move.Move {
@@ -553,24 +569,15 @@ func DiagonalSlidingAttacks(b *board.Board, colorToMove uint) uint64 {
 }
 
 func KnightAttacks(b *board.Board, colorToMove uint) uint64 {
-	knightIndexOffsets := []int{-6, 6, -10, 10, -15, 15, -17, 17}
-	var knightAttacks uint64
+	var attacks uint64
 
-	pieceBitboard := b.Bitboards[colorToMove|piece.TypeKnight]
-
-	for pieceBitboard != 0 {
-		startIndex := bits.TrailingZeros64(pieceBitboard)
-
-		for _, offset := range knightIndexOffsets {
-			if boardhelper.IsValidKnightMove(startIndex, startIndex+offset) {
-				knightAttacks |= 1 << (startIndex + offset)
-			}
-		}
-
-		pieceBitboard &= pieceBitboard - 1
+	knights := b.Bitboards[colorToMove|piece.TypeKnight]
+	for knights != 0 {
+		attacks |= ComputedKnightMoves[bits.TrailingZeros64(knights)]
+		knights &= knights - 1
 	}
 
-	return knightAttacks
+	return attacks
 }
 
 /*
@@ -730,17 +737,16 @@ func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
 		indexOffsetsPawns = []int{-7, -9}
 	}
 
-	kingBitboard := b.Bitboards[colorToMove|piece.TypeKing]
+	kingIndex := bits.TrailingZeros64(b.Bitboards[colorToMove|piece.TypeKing])
 
 	enemyStraightAttackers := b.Bitboards[enemyColor|piece.TypeRook] | b.Bitboards[enemyColor|piece.TypeQueen]
 	enemyDiagonalAttackers := b.Bitboards[enemyColor|piece.TypeBishop] | b.Bitboards[enemyColor|piece.TypeQueen]
-	enemyKnightsBitboard := b.Bitboards[enemyColor|piece.TypeKnight]
 	enemyPawnsBitboard := b.Bitboards[enemyColor|piece.TypePawn]
 
 	otherPiecesStraight := b.OccupancyBitboards[2] & ^enemyStraightAttackers
 	otherPiecesDiagonal := b.OccupancyBitboards[2] & ^enemyDiagonalAttackers
 
-	kingIndex := bits.TrailingZeros64(kingBitboard)
+	knightAttackMask := ComputedKnightMoves[kingIndex] & b.Bitboards[enemyColor|piece.TypeKnight]
 
 	for i, offset := range DirectionalOffsets[:4] {
 		var currentOffsetBitboard uint64
@@ -788,19 +794,9 @@ func CheckMask(b *board.Board, colorToMove uint) (int, uint64) {
 		}
 	}
 
-	for _, offset := range KnightOffsets {
-		rayIndex := kingIndex + offset
-
-		if !boardhelper.IsValidKnightMove(kingIndex, rayIndex) {
-			continue
-		}
-
-		if !boardhelper.IsIndexBitSet(rayIndex, enemyKnightsBitboard) {
-			continue
-		}
-
-		validMoveMask |= 1 << rayIndex
-		checkCnt++
+	if knightAttackMask != 0 {
+		validMoveMask |= knightAttackMask
+		checkCnt += bits.OnesCount64(knightAttackMask)
 	}
 
 	for _, offset := range indexOffsetsPawns {

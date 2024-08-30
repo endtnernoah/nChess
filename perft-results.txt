@@ -1,46 +1,46 @@
-[Initial Position] Perft(0) 1, (Expected 1), match=true, runtime=301ns
-[Initial Position] Perft(1) 20, (Expected 20), match=true, runtime=10.841µs
-[Initial Position] Perft(2) 400, (Expected 400), match=true, runtime=283.235µs
-[Initial Position] Perft(3) 8902, (Expected 8902), match=true, runtime=5.70013ms
-[Initial Position] Perft(4) 197281, (Expected 197281), match=true, runtime=105.912767ms
-[Initial Position] Perft(5) 4865609, (Expected 4865609), match=true, runtime=2.474764124s
-[Initial Position] Perft(6) 119060324, (Expected 119060324), match=true, runtime=59.035582576s
+[Initial Position] Perft(0) 1, (Expected 1), match=true, runtime=480ns
+[Initial Position] Perft(1) 20, (Expected 20), match=true, runtime=13.585µs
+[Initial Position] Perft(2) 400, (Expected 400), match=true, runtime=294.104µs
+[Initial Position] Perft(3) 8902, (Expected 8902), match=true, runtime=6.314299ms
+[Initial Position] Perft(4) 197281, (Expected 197281), match=true, runtime=96.918382ms
+[Initial Position] Perft(5) 4865609, (Expected 4865609), match=true, runtime=2.229659736s
+[Initial Position] Perft(6) 119060324, (Expected 119060324), match=true, runtime=48.744140237s
 
-[Position 2] Perft(0) 1, (Expected 1), match=true, runtime=70ns
-[Position 2] Perft(1) 48, (Expected 48), match=true, runtime=7.275µs
-[Position 2] Perft(2) 2039, (Expected 2039), match=true, runtime=793.686µs
-[Position 2] Perft(3) 97862, (Expected 97862), match=true, runtime=28.434505ms
-[Position 2] Perft(4) 4085603, (Expected 4085603), match=true, runtime=1.51350926s
-[Position 2] Perft(5) 193690690, (Expected 193690690), match=true, runtime=1m3.021320964s
+[Position 2] Perft(0) 1, (Expected 1), match=true, runtime=91ns
+[Position 2] Perft(1) 48, (Expected 48), match=true, runtime=10.8µs
+[Position 2] Perft(2) 2039, (Expected 2039), match=true, runtime=776.073µs
+[Position 2] Perft(3) 97862, (Expected 97862), match=true, runtime=27.727072ms
+[Position 2] Perft(4) 4085603, (Expected 4085603), match=true, runtime=1.319203377s
+[Position 2] Perft(5) 193690690, (Expected 193690690), match=true, runtime=53.417972687s
 
-[Position 3] Perft(0) 1, (Expected 1), match=true, runtime=61ns
-[Position 3] Perft(1) 14, (Expected 14), match=true, runtime=4.088µs
-[Position 3] Perft(2) 191, (Expected 191), match=true, runtime=94.572µs
-[Position 3] Perft(3) 2812, (Expected 2812), match=true, runtime=2.192577ms
-[Position 3] Perft(4) 43238, (Expected 43238), match=true, runtime=28.908057ms
-[Position 3] Perft(5) 674624, (Expected 674624), match=true, runtime=392.944429ms
-[Position 3] Perft(6) 11030083, (Expected 11030083), match=true, runtime=7.273078039s
+[Position 3] Perft(0) 1, (Expected 1), match=true, runtime=100ns
+[Position 3] Perft(1) 14, (Expected 14), match=true, runtime=3.767µs
+[Position 3] Perft(2) 191, (Expected 191), match=true, runtime=85.364µs
+[Position 3] Perft(3) 2812, (Expected 2812), match=true, runtime=1.118039ms
+[Position 3] Perft(4) 43238, (Expected 43238), match=true, runtime=25.134176ms
+[Position 3] Perft(5) 674624, (Expected 674624), match=true, runtime=404.213587ms
+[Position 3] Perft(6) 11030083, (Expected 11030083), match=true, runtime=6.629345656s
 
-[Position 4] Perft(0) 1, (Expected 1), match=true, runtime=110ns
-[Position 4] Perft(1) 6, (Expected 6), match=true, runtime=17.412µs
-[Position 4] Perft(2) 264, (Expected 264), match=true, runtime=65.446µs
-[Position 4] Perft(3) 9467, (Expected 9467), match=true, runtime=3.534844ms
-[Position 4] Perft(4) 422333, (Expected 422333), match=true, runtime=145.604968ms
-[Position 4] Perft(5) 15833292, (Expected 15833292), match=true, runtime=7.564834615s
+[Position 4] Perft(0) 1, (Expected 1), match=true, runtime=90ns
+[Position 4] Perft(1) 6, (Expected 6), match=true, runtime=12.184µs
+[Position 4] Perft(2) 264, (Expected 264), match=true, runtime=77.69µs
+[Position 4] Perft(3) 9467, (Expected 9467), match=true, runtime=4.687874ms
+[Position 4] Perft(4) 422333, (Expected 422333), match=true, runtime=145.003078ms
+[Position 4] Perft(5) 15833292, (Expected 15833292), match=true, runtime=5.974772931s
 
-[Position 5] Perft(0) 1, (Expected 1), match=true, runtime=110ns
-[Position 5] Perft(1) 44, (Expected 44), match=true, runtime=11.592µs
-[Position 5] Perft(2) 1486, (Expected 1486), match=true, runtime=641.427µs
-[Position 5] Perft(3) 62379, (Expected 62379), match=true, runtime=25.212429ms
-[Position 5] Perft(4) 2103487, (Expected 2103487), match=true, runtime=786.010165ms
-[Position 5] Perft(5) 89941194, (Expected 89941194), match=true, runtime=32.361728574s
+[Position 5] Perft(0) 1, (Expected 1), match=true, runtime=100ns
+[Position 5] Perft(1) 44, (Expected 44), match=true, runtime=7.784µs
+[Position 5] Perft(2) 1486, (Expected 1486), match=true, runtime=711.227µs
+[Position 5] Perft(3) 62379, (Expected 62379), match=true, runtime=19.435269ms
+[Position 5] Perft(4) 2103487, (Expected 2103487), match=true, runtime=797.538175ms
+[Position 5] Perft(5) 89941194, (Expected 89941194), match=true, runtime=28.477477362s
 
-[Position 6] Perft(0) 1, (Expected 1), match=true, runtime=110ns
-[Position 6] Perft(1) 46, (Expected 46), match=true, runtime=9.068µs
-[Position 6] Perft(2) 2079, (Expected 2079), match=true, runtime=1.227726ms
-[Position 6] Perft(3) 89890, (Expected 89890), match=true, runtime=32.945968ms
-[Position 6] Perft(4) 3894594, (Expected 3894594), match=true, runtime=1.292771917s
-[Position 6] Perft(5) 164075551, (Expected 164075551), match=true, runtime=1m0.225604413s
+[Position 6] Perft(0) 1, (Expected 1), match=true, runtime=100ns
+[Position 6] Perft(1) 46, (Expected 46), match=true, runtime=7.014µs
+[Position 6] Perft(2) 2079, (Expected 2079), match=true, runtime=773.467µs
+[Position 6] Perft(3) 89890, (Expected 89890), match=true, runtime=24.568621ms
+[Position 6] Perft(4) 3894594, (Expected 3894594), match=true, runtime=1.182641563s
+[Position 6] Perft(5) 164075551, (Expected 164075551), match=true, runtime=54.40753445s
 
 PASS
-ok  	endtner.dev/nChess/game	236.329s
+ok  	endtner.dev/nChess/game	203.944s
