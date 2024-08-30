@@ -1,6 +1,8 @@
-package game
+package t
 
 import (
+	"endtner.dev/nChess/board"
+	"endtner.dev/nChess/movegenerator"
 	"fmt"
 	"strings"
 	"testing"
@@ -14,14 +16,14 @@ import (
 func doPerftTest(positionName string, positionFen string, expectedPerftResults []int64) bool {
 	testingResult := true
 
-	g := New(positionFen)
+	b := board.New(positionFen)
 
 	resultString := strings.Builder{}
 
 	for i := range len(expectedPerftResults) {
 
 		start := time.Now()
-		perftResult := g.Perft(i)
+		perftResult := movegenerator.Perft(b, i)
 
 		resultString.WriteString(fmt.Sprintf("[%s] Perft(%d) %d, (Expected %d), match=%t, runtime=%s\n", positionName, i, perftResult, expectedPerftResults[i], perftResult == expectedPerftResults[i], time.Since(start)))
 		if expectedPerftResults[i] != perftResult {

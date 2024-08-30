@@ -1,8 +1,8 @@
 package formatter
 
 import (
-	"endtner.dev/nChess/game/board"
-	"endtner.dev/nChess/game/piece"
+	"endtner.dev/nChess/board"
+	"endtner.dev/nChess/board/piece"
 	"fmt"
 	"strings"
 )
@@ -56,7 +56,7 @@ func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
 	return unicodeBoard
 }
 
-func FormatUnicodeBoard(board []string) string {
+func UnicodeBoard(board []string) string {
 	/*
 		Please just do not use this function anywhere
 	*/
@@ -72,7 +72,7 @@ func FormatUnicodeBoard(board []string) string {
 	return result.String()
 }
 
-func FormatUnicodeBoardWithBorders(board []string) string {
+func UnicodeBoardWithBorders(board []string) string {
 	/*
 		claude.ai is responsible for this satanic child of a function, but it does work like a charm
 	*/
@@ -127,4 +127,14 @@ func FormatUnicodeBoardWithBorders(board []string) string {
 	result.WriteString("\n")
 
 	return result.String()
+}
+
+func Display(b *board.Board) {
+	unicodeBoard := ToUnicodeBoard(BitboardMappingAll(b))
+	fmt.Println(UnicodeBoard(unicodeBoard))
+}
+
+func DisplayPretty(b *board.Board) {
+	unicodeBoard := ToUnicodeBoard(BitboardMappingAll(b))
+	fmt.Println(UnicodeBoardWithBorders(unicodeBoard))
 }

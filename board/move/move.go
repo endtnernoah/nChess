@@ -1,8 +1,8 @@
 package move
 
 import (
-	"endtner.dev/nChess/game/boardhelper"
-	"endtner.dev/nChess/game/piece"
+	"endtner.dev/nChess/board/boardhelper"
+	"endtner.dev/nChess/board/piece"
 	"fmt"
 )
 

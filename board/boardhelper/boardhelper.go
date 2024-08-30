@@ -79,7 +79,7 @@ func IsValidDiagonalMove(startIndex, targetIndex int) bool {
 	// A move is diagonal if the change in rank equals the change in file
 	isDiagonal := rankDiff == fileDiff
 
-	// Check if the move doesn't wrap around the board
+	// Check if the move doesn't wrap around the old
 	isNoWrap := diff%7 == 0 || diff%9 == 0
 
 	return isDiagonal && isNoWrap
