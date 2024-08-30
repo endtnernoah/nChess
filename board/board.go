@@ -34,7 +34,7 @@ type Board struct {
 	HalfMoves             int
 	FullMoves             int
 
-	stateStack []State
+	history []State
 }
 
 func New(fenString string) *Board {
@@ -210,20 +210,20 @@ func (b *Board) ToFEN() string {
 
 func (b *Board) MakeMove(m move.Move) {
 	// Update the stack
-	s := State{}
+	currentState := State{}
 
-	s.Pieces = make([]uint8, len(b.Pieces))
-	s.Bitboards = make([]uint64, len(b.Bitboards))
+	currentState.Pieces = make([]uint8, len(b.Pieces))
+	currentState.Bitboards = make([]uint64, len(b.Bitboards))
 
-	copy(s.Pieces, b.Pieces)
-	copy(s.Bitboards, b.Bitboards)
+	copy(currentState.Pieces, b.Pieces)
+	copy(currentState.Bitboards, b.Bitboards)
 
-	s.CastlingAvailability = b.CastlingAvailability
-	s.EnPassantTargetSquare = b.EnPassantTargetSquare
-	s.HalfMoves = b.HalfMoves
-	s.FullMoves = b.FullMoves
+	currentState.CastlingAvailability = b.CastlingAvailability
+	currentState.EnPassantTargetSquare = b.EnPassantTargetSquare
+	currentState.HalfMoves = b.HalfMoves
+	currentState.FullMoves = b.FullMoves
 
-	b.stateStack = append(b.stateStack, s)
+	b.history = append(b.history, currentState)
 
 	// Set new castling availability
 	kingSideRookStart := 7
@@ -337,12 +337,12 @@ func (b *Board) MakeMove(m move.Move) {
 }
 
 func (b *Board) UnmakeMove() {
-	if len(b.stateStack) == 0 {
+	if len(b.history) == 0 {
 		return
 	}
 
-	n := len(b.stateStack)
-	lastState := b.stateStack[n-1]
+	n := len(b.history)
+	lastState := b.history[n-1]
 
 	b.Pieces = lastState.Pieces
 	b.Bitboards = lastState.Bitboards
@@ -351,7 +351,7 @@ func (b *Board) UnmakeMove() {
 	b.HalfMoves = lastState.HalfMoves
 	b.FullMoves = lastState.FullMoves
 
-	b.stateStack = b.stateStack[:n-1]
+	b.history = b.history[:n-1]
 
 	// Change color to move
 	b.OtherColorToMove()
