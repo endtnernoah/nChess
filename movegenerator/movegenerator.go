@@ -5,7 +5,9 @@ import (
 	"endtner.dev/nChess/board/boardhelper"
 	"endtner.dev/nChess/board/move"
 	"endtner.dev/nChess/board/piece"
+	"fmt"
 	"math/bits"
+	"time"
 )
 
 /*
@@ -43,19 +45,31 @@ func ComputeAll(b *board.Board) {
 	Generators
 */
 
+var TotalTimePrecompute time.Duration
+var TotalTimeKingGeneration time.Duration
+var TotalTimePawnGeneration time.Duration
+var TotalTimeSlidingGeneration time.Duration
+var TotalTimeKnightGeneration time.Duration
+var TotalTimeValidation time.Duration
+
 func LegalMoves(b *board.Board) []move.Move {
 	/*
 		Creating pseudo-legal moves in an iterative approach, then filtering out illegal moves
 	*/
 
 	// Precompute occupancy, enemy attacks & own pins
+	startPrecompute := time.Now()
 	ComputeAll(b)
+	TotalTimePrecompute += time.Since(startPrecompute)
 
-	pseudoLegalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
-	KingMoves(b, &pseudoLegalMoves)
+	pseudoLegalMoves := make([]move.Move, 218) // Maximum possible moves in a chess position is 218
+	index := 0
+
+	startKingMoves := time.Now()
+	KingMoves(b, &pseudoLegalMoves, &index)
+	TotalTimeKingGeneration += time.Since(startKingMoves)
 
 	friendlyKingIndex := b.FriendlyKingIndex
-
 	opponentAttackMask := Attacks[b.OpponentIndex]
 
 	checkCount := 0
@@ -67,18 +81,25 @@ func LegalMoves(b *board.Board) []move.Move {
 
 	// Can directly return king moves if we are in multi check
 	if checkCount > 1 {
-		return pseudoLegalMoves
+		return pseudoLegalMoves[:index]
 	}
 
-	PawnMoves(b, &pseudoLegalMoves)
-	// OrthogonalSlidingMoves(b, &pseudoLegalMoves)
-	// DiagonalSlidingMoves(b, &pseudoLegalMoves)
-	SlidingMoves(b, &pseudoLegalMoves)
-	KnightMoves(b, &pseudoLegalMoves)
+	startPawnMoves := time.Now()
+	PawnMoves(b, &pseudoLegalMoves, &index)
+	TotalTimePawnGeneration += time.Since(startPawnMoves)
 
-	legalMoves := make([]move.Move, 0, 218) // Maximum possible moves in a chess position is 218
+	startSlidingMoves := time.Now()
+	SlidingMoves(b, &pseudoLegalMoves, &index)
+	TotalTimeSlidingGeneration += time.Since(startSlidingMoves)
 
-	for _, m := range pseudoLegalMoves {
+	startKnightMoves := time.Now()
+	KnightMoves(b, &pseudoLegalMoves, &index)
+	TotalTimeKnightGeneration += time.Since(startKnightMoves)
+
+	legalMoves := make([]move.Move, 0, index)
+
+	startValidation := time.Now()
+	for _, m := range pseudoLegalMoves[:index] {
 
 		// Only move along pin ray if piece is pinned
 		if boardhelper.IsIndexBitSet(m.StartIndex, Pins[b.FriendlyIndex]) && !boardhelper.IsIndexBitSet(m.TargetIndex, calculatePinRay(b, m.StartIndex)) {
@@ -110,6 +131,8 @@ func LegalMoves(b *board.Board) []move.Move {
 
 		legalMoves = append(legalMoves, m)
 	}
+
+	TotalTimeValidation += time.Since(startValidation)
 
 	return legalMoves
 }
@@ -286,7 +309,7 @@ func IsEnPassantMovePinned(b *board.Board, m move.Move) bool {
 	Utility
 */
 
-func Perft(b *board.Board, ply int) int64 {
+func Perft(b *board.Board, ply int, maxPly int) int64 {
 	/*
 		Perft Testing Utility
 	*/
@@ -306,8 +329,12 @@ func Perft(b *board.Board, ply int) int64 {
 	for _, m := range legalMoves {
 		b.MakeMove(m)
 
-		subNodes := Perft(b, ply-1)
+		subNodes := Perft(b, ply-1, maxPly)
 		totalNodes += subNodes
+
+		if ply == maxPly {
+			fmt.Printf("%s: %d\n", move.PrintSimple(m), subNodes)
+		}
 
 		b.UnmakeMove()
 	}

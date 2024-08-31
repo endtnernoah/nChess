@@ -68,11 +68,58 @@ var ComputedKingMoves = func() []uint64 {
 	return moves
 }()
 
+var ComputedPawnMoves = func() [][]uint64 {
+	moves := make([][]uint64, 2)
+	moves[0] = make([]uint64, 64)
+	moves[1] = make([]uint64, 64)
+
+	for startIndex := range 64 {
+		targetIndexWhite := startIndex + 8
+		targetIndexBlack := startIndex - 8
+
+		if boardhelper.IsValidStraightMove(startIndex, targetIndexWhite) {
+			moves[0][startIndex] |= 1 << targetIndexWhite
+		}
+		if boardhelper.IsValidStraightMove(startIndex, targetIndexBlack) {
+			moves[1][startIndex] |= 1 << targetIndexBlack
+		}
+	}
+
+	return moves
+}()
+
+var ComputedPawnAttacks = func() [][]uint64 {
+	moves := make([][]uint64, 2)
+	moves[0] = make([]uint64, 64)
+	moves[1] = make([]uint64, 64)
+
+	for startIndex := range 64 {
+		targetIndexWhite := startIndex + 8
+		targetIndexBlack := startIndex - 8
+
+		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexWhite+1) {
+			moves[0][startIndex] |= 1 << (targetIndexWhite + 1)
+		}
+		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexWhite-1) {
+			moves[0][startIndex] |= 1 << (targetIndexWhite - 1)
+		}
+
+		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexBlack+1) {
+			moves[1][startIndex] |= 1 << (targetIndexBlack + 1)
+		}
+		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexBlack-1) {
+			moves[1][startIndex] |= 1 << (targetIndexBlack - 1)
+		}
+	}
+
+	return moves
+}()
+
 /*
 	Generators
 */
 
-func PawnMoves(b *board.Board, moves *[]move.Move) {
+func PawnMoves(b *board.Board, moves *[]move.Move, index *int) {
 	opponentPiecesMask := Occupancy[b.OpponentIndex]
 	allPiecesMask := Occupancy[2]
 
@@ -90,16 +137,60 @@ func PawnMoves(b *board.Board, moves *[]move.Move) {
 
 		promotionFlag := targetIndex/8 == b.PromotionRank
 
+		// Generate all valid attacks first, better for alpha-beta-pruning
+		attackMask := ComputedPawnAttacks[b.FriendlyIndex][pieceIndex]
+		validAttacks := attackMask & opponentPiecesMask
+
+		// Generate en passant attacks
+		if b.EnPassantTargetSquare != -1 {
+			validAttacks |= attackMask & (1 << b.EnPassantTargetSquare)
+		}
+
+		// Handle pins
+		if (Pins[b.FriendlyIndex] & (1 << pieceIndex)) != 0 {
+			validAttacks &= calculatePinRay(b, pieceIndex)
+		}
+
+		for validAttacks != 0 {
+			attackTargetIndex := bits.TrailingZeros64(validAttacks)
+
+			if promotionFlag {
+				(*moves)[*index] = move.New(pieceIndex, attackTargetIndex, move.WithPromotion(b.FriendlyColor|piece.Knight))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, attackTargetIndex, move.WithPromotion(b.FriendlyColor|piece.Bishop))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, attackTargetIndex, move.WithPromotion(b.FriendlyColor|piece.Queen))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, attackTargetIndex, move.WithPromotion(b.FriendlyColor|piece.Rook))
+				*index++
+			} else {
+				if attackTargetIndex == b.EnPassantTargetSquare {
+					(*moves)[*index] = move.New(pieceIndex, attackTargetIndex, move.WithEnPassantCaptureSquare(attackTargetIndex-b.PawnOffset))
+					*index++
+				} else {
+					(*moves)[*index] = move.New(pieceIndex, attackTargetIndex)
+					*index++
+				}
+			}
+
+			validAttacks &= validAttacks - 1
+		}
+
 		// Add move if target square is empty
 		if !boardhelper.IsIndexBitSet(targetIndex, allPiecesMask) {
 			// Add all promotion moves
 			if promotionFlag {
-				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Knight)))
-				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
-				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Queen)))
-				*moves = append(*moves, move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Rook)))
+				(*moves)[*index] = move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Knight))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Bishop))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Queen))
+				*index++
+				(*moves)[*index] = move.New(pieceIndex, targetIndex, move.WithPromotion(b.FriendlyColor|piece.Rook))
+				*index++
 			} else {
-				*moves = append(*moves, move.New(pieceIndex, targetIndex))
+				(*moves)[*index] = move.New(pieceIndex, targetIndex)
+				*index++
 			}
 		}
 
@@ -114,42 +205,9 @@ func PawnMoves(b *board.Board, moves *[]move.Move) {
 			epTargetIndex := targetIndex + b.PawnOffset
 			if !boardhelper.IsIndexBitSet(targetIndex, allPiecesMask) &&
 				!boardhelper.IsIndexBitSet(epTargetIndex, allPiecesMask) {
-				*moves = append(*moves, move.New(pieceIndex, epTargetIndex, move.WithEnPassantPassedSquare(targetIndex)))
+				(*moves)[*index] = move.New(pieceIndex, epTargetIndex, move.WithEnPassantPassedSquare(targetIndex))
+				*index++
 			}
-		}
-
-		// Check for possible captures
-		side1 := targetIndex - 1
-		side2 := targetIndex + 1
-
-		// Add move if it is in the same target row and targets are not empty
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side1) && boardhelper.IsIndexBitSet(side1, opponentPiecesMask) {
-			if promotionFlag {
-				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Knight)))
-				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
-				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Queen)))
-				*moves = append(*moves, move.New(pieceIndex, side1, move.WithPromotion(b.FriendlyColor|piece.Rook)))
-			} else {
-				*moves = append(*moves, move.New(pieceIndex, side1))
-			}
-		}
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side2) && boardhelper.IsIndexBitSet(side2, opponentPiecesMask) {
-			if promotionFlag {
-				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Knight)))
-				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Bishop)))
-				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Queen)))
-				*moves = append(*moves, move.New(pieceIndex, side2, move.WithPromotion(b.FriendlyColor|piece.Rook)))
-			} else {
-				*moves = append(*moves, move.New(pieceIndex, side2))
-			}
-		}
-
-		// Add move if either side can capture en passant
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side1) && side1 == b.EnPassantTargetSquare {
-			*moves = append(*moves, move.New(pieceIndex, side1, move.WithEnPassantCaptureSquare(side1-b.PawnOffset)))
-		}
-		if boardhelper.IsValidDiagonalMove(pieceIndex, side2) && side2 == b.EnPassantTargetSquare {
-			*moves = append(*moves, move.New(pieceIndex, side2, move.WithEnPassantCaptureSquare(side2-b.PawnOffset)))
 		}
 
 		// Remove LSB of bitboard
@@ -157,59 +215,7 @@ func PawnMoves(b *board.Board, moves *[]move.Move) {
 	}
 }
 
-func OrthogonalSlidingMoves(b *board.Board, moves *[]move.Move) {
-	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
-	allPiecesMask := Occupancy[2]
-
-	pieces := b.Bitboards[b.FriendlyColor|piece.Rook] | b.Bitboards[b.FriendlyColor|piece.Queen]
-	for pieces != 0 {
-		pieceIndex := bits.TrailingZeros64(pieces)
-
-		entry := RookMagics[pieceIndex]
-
-		index := int(((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
-		validMoveMask := RookMoveTable[entry.Offset+index] & ^friendlyPiecesMask
-
-		if (Pins[b.FriendlyIndex] & 1 << pieceIndex) != 0 {
-			validMoveMask &= calculatePinRay(b, pieceIndex)
-		}
-
-		for validMoveMask != 0 {
-			targetIndex := bits.TrailingZeros64(validMoveMask)
-			*moves = append(*moves, move.New(pieceIndex, targetIndex))
-
-			validMoveMask &= validMoveMask - 1
-		}
-
-		pieces &= pieces - 1
-	}
-}
-
-func DiagonalSlidingMoves(b *board.Board, moves *[]move.Move) {
-	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
-	allPiecesMask := Occupancy[2]
-
-	pieces := b.Bitboards[b.FriendlyColor|piece.Bishop] | b.Bitboards[b.FriendlyColor|piece.Queen]
-	for pieces != 0 {
-		pieceIndex := bits.TrailingZeros64(pieces)
-
-		entry := BishopMagics[pieceIndex]
-
-		index := int(((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
-		validMoveMask := BishopMoveTable[entry.Offset+index] & ^friendlyPiecesMask
-
-		for validMoveMask != 0 {
-			targetIndex := bits.TrailingZeros64(validMoveMask)
-			*moves = append(*moves, move.New(pieceIndex, targetIndex))
-
-			validMoveMask &= validMoveMask - 1
-		}
-
-		pieces &= pieces - 1
-	}
-}
-
-func SlidingMoves(b *board.Board, moves *[]move.Move) {
+func SlidingMoves(b *board.Board, moves *[]move.Move, index *int) {
 	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
 	allPiecesMask := Occupancy[2]
 
@@ -221,16 +227,18 @@ func SlidingMoves(b *board.Board, moves *[]move.Move) {
 
 		if friendlyOrthogonalSliders&(1<<pieceIndex) != 0 {
 			entry := RookMagics[pieceIndex]
-			index := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+			moveIndex := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
 
-			validMoveMask := RookMoveTable[entry.Offset+int(index)] & ^friendlyPiecesMask
+			validMoveMask := RookMoveTable[entry.Offset+int(moveIndex)] & ^friendlyPiecesMask
 			if (Pins[b.FriendlyIndex] & (1 << pieceIndex)) != 0 {
 				validMoveMask &= calculatePinRay(b, pieceIndex)
 			}
 
 			for validMoveMask != 0 {
 				targetIndex := bits.TrailingZeros64(validMoveMask)
-				*moves = append(*moves, move.New(pieceIndex, targetIndex))
+
+				(*moves)[*index] = move.New(pieceIndex, targetIndex)
+				*index++
 
 				validMoveMask &= validMoveMask - 1
 			}
@@ -239,16 +247,18 @@ func SlidingMoves(b *board.Board, moves *[]move.Move) {
 		}
 		if friendlyDiagonalSliders&(1<<pieceIndex) != 0 {
 			entry := BishopMagics[pieceIndex]
-			index := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+			moveIndex := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
 
-			validMoveMask := BishopMoveTable[entry.Offset+int(index)] & ^friendlyPiecesMask
+			validMoveMask := BishopMoveTable[entry.Offset+int(moveIndex)] & ^friendlyPiecesMask
 			if (Pins[b.FriendlyIndex] & 1 << pieceIndex) != 0 {
 				validMoveMask &= calculatePinRay(b, pieceIndex)
 			}
 
 			for validMoveMask != 0 {
 				targetIndex := bits.TrailingZeros64(validMoveMask)
-				*moves = append(*moves, move.New(pieceIndex, targetIndex))
+
+				(*moves)[*index] = move.New(pieceIndex, targetIndex)
+				*index++
 
 				validMoveMask &= validMoveMask - 1
 			}
@@ -258,7 +268,7 @@ func SlidingMoves(b *board.Board, moves *[]move.Move) {
 	}
 }
 
-func KnightMoves(b *board.Board, moves *[]move.Move) {
+func KnightMoves(b *board.Board, moves *[]move.Move, index *int) {
 	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
 
 	knights := b.Bitboards[b.FriendlyColor|piece.Knight] & ^Pins[b.FriendlyIndex] // Knights cannot move if pinned
@@ -268,7 +278,9 @@ func KnightMoves(b *board.Board, moves *[]move.Move) {
 		validMoveMask := ComputedKnightMoves[pieceIndex] & ^friendlyPiecesMask
 
 		for validMoveMask != 0 {
-			*moves = append(*moves, move.New(pieceIndex, bits.TrailingZeros64(validMoveMask)))
+			(*moves)[*index] = move.New(pieceIndex, bits.TrailingZeros64(validMoveMask))
+			*index++
+
 			validMoveMask &= validMoveMask - 1
 		}
 
@@ -276,7 +288,7 @@ func KnightMoves(b *board.Board, moves *[]move.Move) {
 	}
 }
 
-func KingMoves(b *board.Board, moves *[]move.Move) {
+func KingMoves(b *board.Board, moves *[]move.Move, index *int) {
 	friendlyKingIndex := b.FriendlyKingIndex
 	friendlyRooks := b.Bitboards[b.FriendlyColor|piece.Rook]
 
@@ -286,7 +298,9 @@ func KingMoves(b *board.Board, moves *[]move.Move) {
 
 	kingMoveMask := ComputedKingMoves[friendlyKingIndex] & ^friendlyPiecesMask & ^opponentAttackMask
 	for kingMoveMask != 0 {
-		*moves = append(*moves, move.New(friendlyKingIndex, bits.TrailingZeros64(kingMoveMask)))
+		(*moves)[*index] = move.New(friendlyKingIndex, bits.TrailingZeros64(kingMoveMask))
+		*index++
+
 		kingMoveMask &= kingMoveMask - 1
 	}
 
@@ -327,14 +341,18 @@ func KingMoves(b *board.Board, moves *[]move.Move) {
 		(kingSideAttackMask&opponentAttackMask) == 0 && // King does not start or pass through attacked field
 		(kingSideEmptyMask&allPiecesMask) == 0 && // All fields are empty
 		boardhelper.IsIndexBitSet(kingSideRookIndex, friendlyRooks) { // There is a rook on its field
-		*moves = append(*moves, move.New(friendlyKingIndex, friendlyKingIndex+2, move.WithRookStartingSquare(kingSideRookIndex)))
+
+		(*moves)[*index] = move.New(friendlyKingIndex, friendlyKingIndex+2, move.WithRookStartingSquare(kingSideRookIndex))
+		*index++
 	}
 
 	if queenSideAllowed &&
 		(queenSideAttackMask&opponentAttackMask) == 0 &&
 		(queenSideEmptyMask&allPiecesMask) == 0 &&
 		boardhelper.IsIndexBitSet(queenSideRookIndex, friendlyRooks) {
-		*moves = append(*moves, move.New(friendlyKingIndex, friendlyKingIndex-2, move.WithRookStartingSquare(queenSideRookIndex)))
+
+		(*moves)[*index] = move.New(friendlyKingIndex, friendlyKingIndex-2, move.WithRookStartingSquare(queenSideRookIndex))
+		*index++
 	}
 }
 

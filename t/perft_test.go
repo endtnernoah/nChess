@@ -23,7 +23,7 @@ func doPerftTest(positionName string, positionFen string, expectedPerftResults [
 	for i := range len(expectedPerftResults) {
 
 		start := time.Now()
-		perftResult := movegenerator.Perft(b, i)
+		perftResult := movegenerator.Perft(b, i, -1)
 
 		resultString.WriteString(fmt.Sprintf("[%s] Perft(%d) %d, (Expected %d), match=%t, runtime=%s\n", positionName, i, perftResult, expectedPerftResults[i], perftResult == expectedPerftResults[i], time.Since(start)))
 		if expectedPerftResults[i] != perftResult {

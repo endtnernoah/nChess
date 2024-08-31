@@ -11,7 +11,8 @@ var Attacks = make([]uint64, 2)
 
 func ComputeAttacks(b *board.Board) {
 	Attacks[b.OpponentIndex] = PawnAttacks(b) |
-		SlidingAttacks(b) |
+		OrthogonalSlidingAttacks(b) |
+		DiagonalSlidingAttacks(b) |
 		KnightAttacks(b) |
 		ComputedKingMoves[b.OpponentKingIndex]
 }
@@ -46,52 +47,39 @@ func PawnAttacks(b *board.Board) uint64 {
 	return attacks
 }
 
-func SlidingAttacks(b *board.Board) uint64 {
+func OrthogonalSlidingAttacks(b *board.Board) uint64 {
 	var attacks uint64
 
-	friendlyPiecesMask := Occupancy[b.OpponentIndex]
-	opponentPiecesMask := Occupancy[b.FriendlyIndex]
+	blockers := Occupancy[2] & ^(1 << b.FriendlyKingIndex)
 
-	opponentKingIndex := b.FriendlyKingIndex
-
-	pieces := b.Bitboards[b.OpponentColor|piece.Rook] | b.Bitboards[b.OpponentColor|piece.Bishop] | b.Bitboards[b.OpponentColor|piece.Queen]
+	pieces := b.Bitboards[b.OpponentColor|piece.Rook] | b.Bitboards[b.OpponentColor|piece.Queen]
 	for pieces != 0 {
 		pieceIndex := bits.TrailingZeros64(pieces)
-		pieceType := b.Pieces[pieceIndex] & 0b00111
 
-		offsetIndexStart := 0
-		offsetIndexEnd := 8
+		entry := RookMagics[pieceIndex]
+		index := int(((blockers & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
 
-		if pieceType == piece.Rook {
-			offsetIndexEnd = 4
-		}
-		if pieceType == piece.Bishop {
-			offsetIndexStart = 4
-		}
+		attacks |= RookMoveTable[entry.Offset+index]
 
-		for i, offset := range DirectionalOffsets[offsetIndexStart:offsetIndexEnd] {
-			targetIndex := pieceIndex + offset
+		pieces &= pieces - 1
+	}
 
-			depth := 1
-			for depth <= DistanceToEdge[pieceIndex][i+offsetIndexStart] {
+	return attacks
+}
 
-				attacks |= 1 << targetIndex
+func DiagonalSlidingAttacks(b *board.Board) uint64 {
+	var attacks uint64
 
-				// If we hit our own piece, we break
-				if boardhelper.IsIndexBitSet(targetIndex, friendlyPiecesMask) {
-					break
-				}
+	blockers := Occupancy[2] & ^(1 << b.FriendlyKingIndex)
 
-				// If we hit an enemy piece except the enemy king, we break
-				if boardhelper.IsIndexBitSet(targetIndex, opponentPiecesMask) && (targetIndex != opponentKingIndex) {
-					break
-				}
+	pieces := b.Bitboards[b.OpponentColor|piece.Bishop] | b.Bitboards[b.OpponentColor|piece.Queen]
+	for pieces != 0 {
+		pieceIndex := bits.TrailingZeros64(pieces)
 
-				targetIndex += offset
-				depth++
-			}
+		entry := BishopMagics[pieceIndex]
+		index := int(((blockers & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
 
-		}
+		attacks |= BishopMoveTable[entry.Offset+index]
 
 		pieces &= pieces - 1
 	}
