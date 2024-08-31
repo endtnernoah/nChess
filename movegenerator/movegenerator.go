@@ -57,7 +57,6 @@ func LegalMoves(b *board.Board) []move.Move {
 	friendlyKingIndex := b.FriendlyKingIndex
 
 	opponentAttackMask := Attacks[b.OpponentIndex]
-	friendlyPinMask := Pins[b.FriendlyIndex]
 
 	checkCount := 0
 	protectMoveMask := ^uint64(0)
@@ -72,6 +71,8 @@ func LegalMoves(b *board.Board) []move.Move {
 	}
 
 	PawnMoves(b, &pseudoLegalMoves)
+	// OrthogonalSlidingMoves(b, &pseudoLegalMoves)
+	// DiagonalSlidingMoves(b, &pseudoLegalMoves)
 	SlidingMoves(b, &pseudoLegalMoves)
 	KnightMoves(b, &pseudoLegalMoves)
 
@@ -80,7 +81,7 @@ func LegalMoves(b *board.Board) []move.Move {
 	for _, m := range pseudoLegalMoves {
 
 		// Only move along pin ray if piece is pinned
-		if boardhelper.IsIndexBitSet(m.StartIndex, friendlyPinMask) && !boardhelper.IsIndexBitSet(m.TargetIndex, calculatePinRay(b, m.StartIndex)) {
+		if boardhelper.IsIndexBitSet(m.StartIndex, Pins[b.FriendlyIndex]) && !boardhelper.IsIndexBitSet(m.TargetIndex, calculatePinRay(b, m.StartIndex)) {
 			continue
 		}
 

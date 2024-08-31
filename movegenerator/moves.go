@@ -157,48 +157,104 @@ func PawnMoves(b *board.Board, moves *[]move.Move) {
 	}
 }
 
-func SlidingMoves(b *board.Board, moves *[]move.Move) {
+func OrthogonalSlidingMoves(b *board.Board, moves *[]move.Move) {
 	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
-	opponentPiecesMask := Occupancy[b.OpponentIndex]
+	allPiecesMask := Occupancy[2]
 
-	pieces := b.Bitboards[b.FriendlyColor|piece.Rook] | b.Bitboards[b.FriendlyColor|piece.Bishop] | b.Bitboards[b.FriendlyColor|piece.Queen]
+	pieces := b.Bitboards[b.FriendlyColor|piece.Rook] | b.Bitboards[b.FriendlyColor|piece.Queen]
 	for pieces != 0 {
 		pieceIndex := bits.TrailingZeros64(pieces)
-		pieceType := b.Pieces[pieceIndex] & 0b00111
 
-		offsetIndexStart := 0
-		offsetIndexEnd := 8
+		entry := RookMagics[pieceIndex]
 
-		// Manipulating indices based on piece type
-		if pieceType == piece.Rook {
-			offsetIndexEnd = 4
-		}
-		if pieceType == piece.Bishop {
-			offsetIndexStart = 4
+		index := int(((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
+		validMoveMask := RookMoveTable[entry.Offset+index] & ^friendlyPiecesMask
+
+		if (Pins[b.FriendlyIndex] & 1 << pieceIndex) != 0 {
+			validMoveMask &= calculatePinRay(b, pieceIndex)
 		}
 
-		for i, offset := range DirectionalOffsets[offsetIndexStart:offsetIndexEnd] {
-			targetIndex := pieceIndex + offset
+		for validMoveMask != 0 {
+			targetIndex := bits.TrailingZeros64(validMoveMask)
+			*moves = append(*moves, move.New(pieceIndex, targetIndex))
 
-			depth := 1
-			for depth <= DistanceToEdge[pieceIndex][i+offsetIndexStart] {
-				if boardhelper.IsIndexBitSet(targetIndex, friendlyPiecesMask) {
-					break
-				}
-
-				*moves = append(*moves, move.New(pieceIndex, targetIndex))
-
-				// Break if we captured an enemy
-				if boardhelper.IsIndexBitSet(targetIndex, opponentPiecesMask) {
-					break
-				}
-
-				targetIndex += offset
-				depth++
-			}
+			validMoveMask &= validMoveMask - 1
 		}
 
 		pieces &= pieces - 1
+	}
+}
+
+func DiagonalSlidingMoves(b *board.Board, moves *[]move.Move) {
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	allPiecesMask := Occupancy[2]
+
+	pieces := b.Bitboards[b.FriendlyColor|piece.Bishop] | b.Bitboards[b.FriendlyColor|piece.Queen]
+	for pieces != 0 {
+		pieceIndex := bits.TrailingZeros64(pieces)
+
+		entry := BishopMagics[pieceIndex]
+
+		index := int(((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift))
+		validMoveMask := BishopMoveTable[entry.Offset+index] & ^friendlyPiecesMask
+
+		for validMoveMask != 0 {
+			targetIndex := bits.TrailingZeros64(validMoveMask)
+			*moves = append(*moves, move.New(pieceIndex, targetIndex))
+
+			validMoveMask &= validMoveMask - 1
+		}
+
+		pieces &= pieces - 1
+	}
+}
+
+func SlidingMoves(b *board.Board, moves *[]move.Move) {
+	friendlyPiecesMask := Occupancy[b.FriendlyIndex]
+	allPiecesMask := Occupancy[2]
+
+	friendlyOrthogonalSliders := b.Bitboards[b.FriendlyColor|piece.Rook] | b.Bitboards[b.FriendlyColor|piece.Queen]
+	friendlyDiagonalSliders := b.Bitboards[b.FriendlyColor|piece.Bishop] | b.Bitboards[b.FriendlyColor|piece.Queen]
+
+	for friendlyOrthogonalSliders|friendlyDiagonalSliders != 0 {
+		pieceIndex := bits.TrailingZeros64(friendlyOrthogonalSliders | friendlyDiagonalSliders)
+
+		if friendlyOrthogonalSliders&(1<<pieceIndex) != 0 {
+			entry := RookMagics[pieceIndex]
+			index := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+
+			validMoveMask := RookMoveTable[entry.Offset+int(index)] & ^friendlyPiecesMask
+			if (Pins[b.FriendlyIndex] & (1 << pieceIndex)) != 0 {
+				validMoveMask &= calculatePinRay(b, pieceIndex)
+			}
+
+			for validMoveMask != 0 {
+				targetIndex := bits.TrailingZeros64(validMoveMask)
+				*moves = append(*moves, move.New(pieceIndex, targetIndex))
+
+				validMoveMask &= validMoveMask - 1
+			}
+
+			friendlyOrthogonalSliders &= friendlyOrthogonalSliders - 1
+		}
+		if friendlyDiagonalSliders&(1<<pieceIndex) != 0 {
+			entry := BishopMagics[pieceIndex]
+			index := ((allPiecesMask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+
+			validMoveMask := BishopMoveTable[entry.Offset+int(index)] & ^friendlyPiecesMask
+			if (Pins[b.FriendlyIndex] & 1 << pieceIndex) != 0 {
+				validMoveMask &= calculatePinRay(b, pieceIndex)
+			}
+
+			for validMoveMask != 0 {
+				targetIndex := bits.TrailingZeros64(validMoveMask)
+				*moves = append(*moves, move.New(pieceIndex, targetIndex))
+
+				validMoveMask &= validMoveMask - 1
+			}
+
+			friendlyDiagonalSliders &= friendlyDiagonalSliders - 1
+		}
 	}
 }
 

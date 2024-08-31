@@ -14,7 +14,6 @@ func main() {
 	b := board.New(startPosition)
 
 	formatter.DisplayPretty(b)
-	movegenerator.ComputeAll(b)
 	fmt.Println(b.ToFEN())
 
 	ply := 6
