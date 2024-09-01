@@ -45,7 +45,8 @@ type Board struct {
 	HalfMoves             int
 	FullMoves             int
 
-	history []State
+	history     []State
+	MoveHistory []string
 }
 
 func New(fenString string) *Board {
@@ -254,6 +255,8 @@ func (b *Board) MakeMove(m move.Move) {
 
 	b.history = append(b.history, currentState)
 
+	b.MoveHistory = append(b.MoveHistory, move.PrintSimple(m)) // TODO
+
 	// Set new castling availability
 	kingSideRookStart := 7
 	queenSideRookStart := 0
@@ -381,6 +384,8 @@ func (b *Board) UnmakeMove() {
 	b.FullMoves = lastState.FullMoves
 
 	b.history = b.history[:n-1]
+
+	b.MoveHistory = b.MoveHistory[:len(b.MoveHistory)-1]
 
 	// Change color to move
 	b.OtherColorToMove()
