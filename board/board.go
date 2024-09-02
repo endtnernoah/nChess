@@ -347,7 +347,7 @@ func (b *Board) MakeMove(m move.Move) {
 		if m.EnPassantCaptureSquare != -1 {
 			epCapturedPiece := b.Pieces[m.EnPassantCaptureSquare]
 			if epCapturedPiece != 0 && ((epCapturedPiece&0b11000)&(movedPiece&0b11000)) == 0 {
-				b.Pieces[m.TargetIndex] = 0
+				b.Pieces[m.EnPassantCaptureSquare] = 0
 				b.Bitboards[epCapturedPiece] &= ^(1 << m.EnPassantCaptureSquare)
 			}
 		}
