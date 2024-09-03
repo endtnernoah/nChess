@@ -6,6 +6,7 @@ import (
 	"endtner.dev/nChess/board/piece"
 	"fmt"
 	"math/bits"
+	"math/rand"
 	"slices"
 	"strconv"
 	"strings"
@@ -46,6 +47,12 @@ type Board struct {
 	FullMoves             int
 
 	history []State
+
+	Zobrist               uint64
+	ZobristBlackToMove    uint64
+	ZobristTable          [64][23]uint64
+	ZobristEnPassant      [64]uint64
+	ZobristCastlingRights [16]uint64
 }
 
 func New(fenString string) *Board {
@@ -153,7 +160,48 @@ func New(fenString string) *Board {
 	}
 	b.FullMoves = data
 
+	r := rand.New(rand.NewSource(25042024))
+	b.ZobristBlackToMove = r.Uint64()
+
+	// Initializing zobrist
+	for i := range len(b.ZobristTable) {
+		for j := range len(b.ZobristTable[0]) {
+			b.ZobristTable[i][j] = r.Uint64()
+		}
+	}
+
+	for i := range len(b.ZobristEnPassant) {
+		b.ZobristEnPassant[i] = r.Uint64()
+	}
+
+	for i := range len(b.ZobristCastlingRights) {
+		b.ZobristCastlingRights[i] = r.Uint64()
+	}
+
+	b.UpdateZobrist()
+
 	return &b
+}
+
+func (b *Board) UpdateZobrist() {
+	b.Zobrist = 0
+
+	for i, p := range b.Pieces {
+		if p != 0 {
+			pieceBitString := b.ZobristTable[i][p]
+			b.Zobrist ^= pieceBitString
+		}
+	}
+
+	if b.EnPassantTargetSquare != -1 {
+		b.Zobrist ^= b.ZobristEnPassant[b.EnPassantTargetSquare]
+	}
+
+	if !b.WhiteToMove {
+		b.Zobrist ^= b.ZobristBlackToMove
+	}
+
+	b.Zobrist ^= b.ZobristCastlingRights[b.CastlingAvailability]
 }
 
 func (b *Board) ToFEN() string {
@@ -363,6 +411,7 @@ func (b *Board) MakeMove(m move.Move) {
 
 	// Switch around the color
 	b.OtherColorToMove()
+	b.UpdateZobrist()
 }
 
 func (b *Board) UnmakeMove() {
@@ -384,6 +433,7 @@ func (b *Board) UnmakeMove() {
 
 	// Change color to move
 	b.OtherColorToMove()
+	b.UpdateZobrist()
 }
 
 func (b *Board) OtherColorToMove() {

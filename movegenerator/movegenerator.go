@@ -309,6 +309,17 @@ func IsEnPassantMovePinned(b *board.Board, m move.Move) bool {
 	Utility
 */
 
+type TTablePerft map[uint64]int64
+
+var tt = make([]TTablePerft, 10)
+var isInitialized = func() bool {
+	for i := range len(tt) {
+		tt[i] = make(TTablePerft)
+	}
+
+	return true
+}()
+
 func Perft(b *board.Board, ply int, maxPly int) int64 {
 	/*
 		Perft Testing Utility
@@ -320,6 +331,10 @@ func Perft(b *board.Board, ply int, maxPly int) int64 {
 
 	legalMoves := LegalMoves(b)
 	var totalNodes int64 = 0
+
+	if nodes, found := tt[ply][b.Zobrist]; found {
+		return nodes
+	}
 
 	// Not the official implementation, but works a lot faster
 	if ply == 1 {
@@ -339,5 +354,6 @@ func Perft(b *board.Board, ply int, maxPly int) int64 {
 		b.UnmakeMove()
 	}
 
+	tt[ply][b.Zobrist] = totalNodes
 	return totalNodes
 }
