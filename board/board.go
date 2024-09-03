@@ -50,7 +50,7 @@ type Board struct {
 	history []State
 
 	Zobrist               uint64
-	ZobristBlackToMove    uint64
+	ZobristColorToMove    uint64
 	ZobristTable          [64][23]uint64
 	ZobristEnPassant      [64]uint64
 	ZobristCastlingRights [16]uint64
@@ -162,7 +162,7 @@ func New(fenString string) *Board {
 	b.FullMoves = data
 
 	r := rand.New(rand.NewSource(25042024))
-	b.ZobristBlackToMove = r.Uint64()
+	b.ZobristColorToMove = r.Uint64()
 
 	// Initializing zobrist
 	for i := range len(b.ZobristTable) {
@@ -179,30 +179,9 @@ func New(fenString string) *Board {
 		b.ZobristCastlingRights[i] = r.Uint64()
 	}
 
-	b.UpdateZobrist()
+	b.InitZobrist()
 
 	return &b
-}
-
-func (b *Board) UpdateZobrist() {
-	b.Zobrist = 0
-
-	for i, p := range b.Pieces {
-		if p != 0 {
-			pieceBitString := b.ZobristTable[i][p]
-			b.Zobrist ^= pieceBitString
-		}
-	}
-
-	if b.EnPassantTargetSquare != -1 {
-		b.Zobrist ^= b.ZobristEnPassant[b.EnPassantTargetSquare]
-	}
-
-	if !b.WhiteToMove {
-		b.Zobrist ^= b.ZobristBlackToMove
-	}
-
-	b.Zobrist ^= b.ZobristCastlingRights[b.CastlingAvailability]
 }
 
 func (b *Board) ToFEN() string {
@@ -304,6 +283,9 @@ func (b *Board) MakeMove(m move.Move) {
 
 	b.history = append(b.history, currentState)
 
+	// Zobrist: Switch color
+	b.Zobrist ^= b.ZobristColorToMove
+
 	// Set new castling availability
 	kingSideRookStart := 7
 	queenSideRookStart := 0
@@ -319,21 +301,32 @@ func (b *Board) MakeMove(m move.Move) {
 		queenSideBitIndex = 0
 	}
 
+	// Zobrist: Hash out old castling rights
+	b.Zobrist ^= b.ZobristCastlingRights[b.CastlingAvailability]
+
 	if m.StartIndex == kingSideRookStart {
 		b.CastlingAvailability = b.CastlingAvailability & ^(1 << kingSideBitIndex)
-	}
-	if m.StartIndex == queenSideRookStart {
+	} else if m.StartIndex == queenSideRookStart {
 		b.CastlingAvailability = b.CastlingAvailability & ^(1 << queenSideBitIndex)
-	}
-	if m.StartIndex == kingStart {
+	} else if m.StartIndex == kingStart {
 		b.CastlingAvailability = b.CastlingAvailability & ^(1 << kingSideBitIndex)
 		b.CastlingAvailability = b.CastlingAvailability & ^(1 << queenSideBitIndex)
 	}
 
-	// Setting EP Target Square
+	// Zobrist: Hash in new castling rights
+	b.Zobrist ^= b.ZobristCastlingRights[b.CastlingAvailability]
+
+	// Zobrist: Hashing out current EP Target Square
+	if b.EnPassantTargetSquare != -1 {
+		b.Zobrist ^= b.ZobristEnPassant[b.EnPassantTargetSquare]
+	}
+
 	if m.EnPassantPassedSquare != -1 {
 		b.EnPassantTargetSquare = m.EnPassantPassedSquare
-	} else {
+
+		// Zobrist: Hashing in new EP Target Square
+		b.Zobrist ^= b.ZobristEnPassant[b.EnPassantTargetSquare]
+	} else if b.EnPassantTargetSquare != -1 {
 		b.EnPassantTargetSquare = -1
 	}
 
@@ -362,6 +355,10 @@ func (b *Board) MakeMove(m move.Move) {
 		b.Pieces[m.TargetIndex] = movedPiece
 		b.Bitboards[movedPiece] = (b.Bitboards[movedPiece] & ^(1 << m.StartIndex)) | (1 << m.TargetIndex)
 
+		// Zobrist: Update moved king
+		b.Zobrist ^= b.ZobristTable[m.StartIndex][movedPiece]
+		b.Zobrist ^= b.ZobristTable[m.TargetIndex][movedPiece]
+
 		movedRook := b.Pieces[m.RookStartingSquare]
 
 		// Remove rook from pieces
@@ -374,9 +371,17 @@ func (b *Board) MakeMove(m move.Move) {
 		if isKingSideCastle {
 			b.Pieces[kingSideTargetSquare] = movedRook
 			b.Bitboards[movedRook] = (b.Bitboards[movedRook] & ^(1 << m.RookStartingSquare)) | (1 << kingSideTargetSquare)
+
+			// Zobrist: Update moved rook
+			b.Zobrist ^= b.ZobristTable[m.RookStartingSquare][movedRook]
+			b.Zobrist ^= b.ZobristTable[kingSideTargetSquare][movedRook]
 		} else {
 			b.Pieces[queenSideTargetSquare] = movedRook
 			b.Bitboards[movedRook] = (b.Bitboards[movedRook] & ^(1 << m.RookStartingSquare)) | (1 << queenSideTargetSquare)
+
+			// Zobrist: Update moved rook
+			b.Zobrist ^= b.ZobristTable[m.RookStartingSquare][movedRook]
+			b.Zobrist ^= b.ZobristTable[queenSideTargetSquare][movedRook]
 		}
 	} else {
 		// Remove piece from source square
@@ -388,6 +393,9 @@ func (b *Board) MakeMove(m move.Move) {
 		if capturedPiece != 0 && ((capturedPiece&0b11000)&(movedPiece&0b11000)) == 0 {
 			b.Pieces[m.TargetIndex] = 0
 			b.Bitboards[capturedPiece] &= ^(1 << m.TargetIndex)
+
+			// Zobrist: Update captured piece
+			b.Zobrist ^= b.ZobristTable[m.TargetIndex][capturedPiece]
 		}
 
 		// Possibly remove EP captured piece
@@ -396,6 +404,9 @@ func (b *Board) MakeMove(m move.Move) {
 			if epCapturedPiece != 0 && ((epCapturedPiece&0b11000)&(movedPiece&0b11000)) == 0 {
 				b.Pieces[m.EnPassantCaptureSquare] = 0
 				b.Bitboards[epCapturedPiece] &= ^(1 << m.EnPassantCaptureSquare)
+
+				// Zobrist: Update EP Capture
+				b.Zobrist ^= b.ZobristTable[m.EnPassantCaptureSquare][epCapturedPiece]
 			}
 		}
 
@@ -404,16 +415,23 @@ func (b *Board) MakeMove(m move.Move) {
 			// Add newly promoted piece
 			b.Pieces[m.TargetIndex] = m.PromotionPiece
 			b.Bitboards[m.PromotionPiece] |= 1 << m.TargetIndex
+
+			// Zobrist: Update moved piece promotion
+			b.Zobrist ^= b.ZobristTable[m.StartIndex][movedPiece]
+			b.Zobrist ^= b.ZobristTable[m.TargetIndex][m.PromotionPiece]
 		} else {
 			// Updating piece position
 			b.Pieces[m.TargetIndex] = movedPiece
 			b.Bitboards[movedPiece] |= 1 << m.TargetIndex
+
+			// Zobrist: Update moved piece
+			b.Zobrist ^= b.ZobristTable[m.StartIndex][movedPiece]
+			b.Zobrist ^= b.ZobristTable[m.TargetIndex][movedPiece]
 		}
 	}
 
 	// Switch around the color
 	b.OtherColorToMove()
-	b.UpdateZobrist()
 }
 
 func (b *Board) UnmakeMove() {
@@ -450,4 +468,25 @@ func (b *Board) OtherColorToMove() {
 	b.PawnOffset *= -1
 
 	b.PromotionRank = 7 - b.PromotionRank
+}
+
+func (b *Board) InitZobrist() {
+	b.Zobrist = 0
+
+	if !b.WhiteToMove {
+		b.Zobrist ^= b.ZobristColorToMove
+	}
+
+	b.Zobrist ^= b.ZobristCastlingRights[b.CastlingAvailability]
+
+	if b.EnPassantTargetSquare != -1 {
+		b.Zobrist ^= b.ZobristEnPassant[b.EnPassantTargetSquare]
+	}
+
+	for i, p := range b.Pieces {
+		if p != 0 {
+			pieceBitString := b.ZobristTable[i][p]
+			b.Zobrist ^= pieceBitString
+		}
+	}
 }
