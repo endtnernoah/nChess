@@ -89,61 +89,6 @@ func GenerateOccupancies(mask uint64) []uint64 {
 	return occupancies
 }
 
-func getPerfectBishopMagic(square int) (uint64, int) {
-	switch square {
-	case 0:
-		return 0xffedf9fd7cfcffff, 5
-	case 1:
-		return 0xfc0962854a77f576, 4
-	case 6:
-		return 0xfc0a66c64a7ef576, 4
-	case 7:
-		return 0x7ffdfdfcbd79ffff, 5
-	case 8:
-		return 0xfc0846a64a34fff6, 4
-	case 9:
-		return 0xfc087a874a3cf7f6, 4
-	case 14:
-		return 0xfc0864ae59b4ff76, 4
-	case 15:
-		return 0x3c0860af4b35ff76, 4
-	case 16:
-		return 0x73C01AF56CF4CFFB, 4
-	case 17:
-		return 0x41A01CFAD64AAFFC, 4
-	case 22:
-		return 0x7c0c028f5b34ff76, 4
-	case 23:
-		return 0xfc0a028e5ab4df76, 4
-	case 40:
-		return 0xDCEFD9B54BFCC09F, 4
-	case 41:
-		return 0xF95FFA765AFD602B, 4
-	case 46:
-		return 0x43ff9a5cf4ca0c01, 4
-	case 47:
-		return 0x4BFFCD8E7C587601, 4
-	case 48:
-		return 0xfc0ff2865334f576, 4
-	case 49:
-		return 0xfc0bf6ce5924f576, 4
-	case 54:
-		return 0xc3ffb7dc36ca8c89, 4
-	case 55:
-		return 0xc3ff8a54f4ca2c89, 4
-	case 56:
-		return 0xfffffcfcfd79edff, 5
-	case 57:
-		return 0xfc0863fccb147576, 4
-	case 62:
-		return 0xfc087e8e4bb2f736, 4
-	case 63:
-		return 0x43ff9e4ef4ca2c89, 5
-	}
-
-	return 0, 0
-}
-
 func FindMagic(square int, pieceType uint8) (MagicEntry, int) {
 	mask := Mask(square, pieceType)
 
@@ -158,16 +103,6 @@ func FindMagic(square int, pieceType uint8) (MagicEntry, int) {
 
 	for {
 		magic := rand.Uint64() & rand.Uint64() & rand.Uint64()
-
-		if pieceType == piece.Bishop {
-			perfectMagic, perfectShift := getPerfectBishopMagic(square)
-
-			if perfectMagic != 0 {
-				magic = perfectMagic
-				shift = perfectShift
-			}
-		}
-
 		if bits.OnesCount64(magic*mask) < 6 {
 			continue
 		}
@@ -278,6 +213,13 @@ var RookMoveTable = func() []uint64 {
 	return rookMoveTable
 }()
 
+func GetRookMoves(square int, mask uint64) uint64 {
+	entry := RookMagics[square]
+	moveIndex := ((mask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+
+	return RookMoveTable[entry.Offset+int(moveIndex)]
+}
+
 var BishopMagics = []MagicEntry{
 	MagicEntry{0x40201008040200, 0xffedf9fd7cfcffff, 5, 0},
 	MagicEntry{0x402010080400, 0xfc0962854a77f576, 4, 32},
@@ -360,3 +302,17 @@ var BishopMoveTable = func() []uint64 {
 
 	return bishopMoveTable
 }()
+
+func GetBishopMoves(square int, mask uint64) uint64 {
+	entry := BishopMagics[square]
+	moveIndex := ((mask & entry.Mask) * entry.Magic) >> (64 - entry.Shift)
+
+	return BishopMoveTable[entry.Offset+int(moveIndex)]
+}
+
+func GetSliderMoves(square int, mask uint64, orthogonal bool) uint64 {
+	if orthogonal {
+		return GetRookMoves(square, mask)
+	}
+	return GetBishopMoves(square, mask)
+}
