@@ -21,6 +21,7 @@ type State struct {
 	EnPassantTargetSquare int
 	HalfMoves             int
 	FullMoves             int
+	Zobrist               uint64
 }
 
 type Board struct {
@@ -299,6 +300,7 @@ func (b *Board) MakeMove(m move.Move) {
 	currentState.EnPassantTargetSquare = b.EnPassantTargetSquare
 	currentState.HalfMoves = b.HalfMoves
 	currentState.FullMoves = b.FullMoves
+	currentState.Zobrist = b.Zobrist
 
 	b.history = append(b.history, currentState)
 
@@ -428,12 +430,12 @@ func (b *Board) UnmakeMove() {
 	b.EnPassantTargetSquare = lastState.EnPassantTargetSquare
 	b.HalfMoves = lastState.HalfMoves
 	b.FullMoves = lastState.FullMoves
+	b.Zobrist = lastState.Zobrist
 
 	b.history = b.history[:n-1]
 
 	// Change color to move
 	b.OtherColorToMove()
-	b.UpdateZobrist()
 }
 
 func (b *Board) OtherColorToMove() {
