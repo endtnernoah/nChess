@@ -7,7 +7,6 @@ import (
 	"endtner.dev/nChess/board/piece"
 	"fmt"
 	"math/bits"
-	"os"
 	"time"
 )
 
@@ -51,12 +50,6 @@ func LegalMoves(b *board.Board) []move.Move {
 	friendlyDiagonalSliders := b.Bitboards[friendlyColor|piece.Bishop] | b.Bitboards[friendlyColor|piece.Queen]
 	friendlyKingBitboard := b.Bitboards[friendlyColor|piece.King]
 	friendlyKingIndex := b.FriendlyKingIndex
-
-	if friendlyKingIndex == 64 {
-		fmt.Println(b.ToFEN())
-		fmt.Println(b.MoveHistory)
-		os.Exit(0)
-	}
 
 	opponentOrthogonalSliders := b.Bitboards[opponentColor|piece.Rook] | b.Bitboards[opponentColor|piece.Queen]
 	opponentDiagonalSliders := b.Bitboards[opponentColor|piece.Bishop] | b.Bitboards[opponentColor|piece.Queen]
