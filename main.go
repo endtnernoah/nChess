@@ -2,6 +2,7 @@ package main
 
 import (
 	"endtner.dev/nChess/board"
+	"endtner.dev/nChess/evaluator"
 	"endtner.dev/nChess/formatter"
 	"endtner.dev/nChess/movegenerator"
 	"fmt"
@@ -9,19 +10,20 @@ import (
 )
 
 var startPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-var testPosition = "8/2p5/3p4/KP5r/1R2Pp1k/8/6P1/8 b - e3 0 1"
+var testPosition = "2B5/2P2n2/1KR5/p6k/1P1P1P2/2N3pp/1P2p3/n7 w - - 0 1"
 
 func main() {
-	b := board.New(startPosition)
+	b := board.New(testPosition)
 
 	formatter.DisplayPretty(b)
 	fmt.Println(b.ToFEN())
+	fmt.Printf("score: %d\n", evaluator.Evaluate(b))
+
+	return
 
 	ply := 6
 	startTotal := time.Now()
-	fmt.Printf("Perft(%d)=%d, took %s\n", ply, movegenerator.Perft(b, ply, ply), time.Since(startTotal))
-
-	return
+	fmt.Printf("Perft(%d)=%d, took %s\n", ply, movegenerator.Perft(b, ply, -1), time.Since(startTotal))
 
 	fmt.Println("")
 	fmt.Printf("Precomputation: %s\n", movegenerator.TotalTimePrecompute)
