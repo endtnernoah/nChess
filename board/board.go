@@ -51,7 +51,7 @@ type Board struct {
 
 	Zobrist               uint64
 	ZobristColorToMove    uint64
-	ZobristTable          [64][23]uint64
+	ZobristTable          [64][0b1111]uint64
 	ZobristEnPassant      [64]uint64
 	ZobristCastlingRights [16]uint64
 }
@@ -67,7 +67,7 @@ func New(fenString string) *Board {
 	slices.Reverse(figurePositionRows)
 	figurePositions := strings.Join(figurePositionRows, "/")
 
-	b.Bitboards = make([]uint64, 0b10111)
+	b.Bitboards = make([]uint64, 0b1111)
 	b.Pieces = make([]uint8, 64)
 
 	// Setting up pieces
@@ -117,7 +117,7 @@ func New(fenString string) *Board {
 		b.PromotionRank = 0
 	}
 
-	b.FriendlyIndex = int((b.FriendlyColor >> 3) - 1)
+	b.FriendlyIndex = int(b.FriendlyColor >> 3)
 	b.OpponentIndex = 1 - b.FriendlyIndex
 
 	b.FriendlyKingIndex = bits.TrailingZeros64(b.Bitboards[b.FriendlyColor|piece.King])

@@ -1,7 +1,7 @@
 package piece
 
-var White uint8 = 0b01000
-var Black uint8 = 0b10000
+var White uint8 = 0b00000
+var Black uint8 = 0b01000
 
 var Pawn uint8 = 0b00001
 var Rook uint8 = 0b00010
