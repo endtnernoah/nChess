@@ -1,4 +1,4 @@
-package boardhelper
+package board
 
 import (
 	"unicode"

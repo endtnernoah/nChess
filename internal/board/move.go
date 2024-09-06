@@ -1,8 +1,6 @@
-package move
+package board
 
 import (
-	"endtner.dev/nChess/board/boardhelper"
-	"endtner.dev/nChess/board/piece"
 	"fmt"
 )
 
@@ -59,9 +57,9 @@ func New(startIndex int, targetIndex int, optionalParameters ...OptionalParamete
 }
 
 func Print(m Move) string {
-	return fmt.Sprintf("Move(from: %s, to: %s)\n", boardhelper.IndexToSquare(m.StartIndex), boardhelper.IndexToSquare(m.TargetIndex))
+	return fmt.Sprintf("Move(from: %s, to: %s)\n", IndexToSquare(m.StartIndex), IndexToSquare(m.TargetIndex))
 }
 
 func PrintSimple(m Move) string {
-	return fmt.Sprintf("%s%s%s", boardhelper.IndexToSquare(m.StartIndex), boardhelper.IndexToSquare(m.TargetIndex), piece.ToString(m.PromotionPiece))
+	return fmt.Sprintf("%s%s%s", IndexToSquare(m.StartIndex), IndexToSquare(m.TargetIndex), ToString(m.PromotionPiece))
 }

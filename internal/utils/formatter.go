@@ -1,37 +1,36 @@
-package formatter
+package utils
 
 import (
-	"endtner.dev/nChess/board"
-	"endtner.dev/nChess/board/piece"
+	"endtner.dev/nChess/internal/board"
 	"fmt"
 	"strings"
 )
 
-func BitboardMappingWhite(b *board.Board) map[uint64]string {
+func BitboardMappingWhite(p *board.Position) map[uint64]string {
 	return map[uint64]string{
-		b.Bitboards[piece.White|piece.Pawn]:   "♙",
-		b.Bitboards[piece.White|piece.Rook]:   "♖",
-		b.Bitboards[piece.White|piece.Knight]: "♘",
-		b.Bitboards[piece.White|piece.Bishop]: "♗",
-		b.Bitboards[piece.White|piece.Queen]:  "♕",
-		b.Bitboards[piece.White|piece.King]:   "♔",
+		p.Bitboards[board.White|board.Pawn]:   "♙",
+		p.Bitboards[board.White|board.Rook]:   "♖",
+		p.Bitboards[board.White|board.Knight]: "♘",
+		p.Bitboards[board.White|board.Bishop]: "♗",
+		p.Bitboards[board.White|board.Queen]:  "♕",
+		p.Bitboards[board.White|board.King]:   "♔",
 	}
 }
 
-func BitboardMappingBlack(b *board.Board) map[uint64]string {
+func BitboardMappingBlack(p *board.Position) map[uint64]string {
 	return map[uint64]string{
-		b.Bitboards[piece.Black|piece.Pawn]:   "♟",
-		b.Bitboards[piece.Black|piece.Rook]:   "♜",
-		b.Bitboards[piece.Black|piece.Knight]: "♞",
-		b.Bitboards[piece.Black|piece.Bishop]: "♝",
-		b.Bitboards[piece.Black|piece.Queen]:  "♛",
-		b.Bitboards[piece.Black|piece.King]:   "♚",
+		p.Bitboards[board.Black|board.Pawn]:   "♟",
+		p.Bitboards[board.Black|board.Rook]:   "♜",
+		p.Bitboards[board.Black|board.Knight]: "♞",
+		p.Bitboards[board.Black|board.Bishop]: "♝",
+		p.Bitboards[board.Black|board.Queen]:  "♛",
+		p.Bitboards[board.Black|board.King]:   "♚",
 	}
 }
 
-func BitboardMappingAll(b *board.Board) map[uint64]string {
-	white := BitboardMappingWhite(b)
-	black := BitboardMappingBlack(b)
+func BitboardMappingAll(p *board.Position) map[uint64]string {
+	white := BitboardMappingWhite(p)
+	black := BitboardMappingBlack(p)
 
 	for k, v := range black {
 		white[k] = v
@@ -39,7 +38,7 @@ func BitboardMappingAll(b *board.Board) map[uint64]string {
 	return white
 }
 
-func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
+func FromMapping(bitboardMapping map[uint64]string) []string {
 	unicodeBoard := make([]string, 64)
 	for i := range unicodeBoard {
 		unicodeBoard[i] = " " // Initialize with empty squares
@@ -56,23 +55,7 @@ func ToUnicodeBoard(bitboardMapping map[uint64]string) []string {
 	return unicodeBoard
 }
 
-func UnicodeBoard(board []string) string {
-	/*
-		Please just do not use this function anywhere
-	*/
-	var result strings.Builder
-
-	for i := 63; i >= 0; i -= 8 {
-		for j := 7; j >= 0; j-- {
-			result.WriteString(board[i-j])
-			result.WriteString(" ")
-		}
-		result.WriteString("\n")
-	}
-	return result.String()
-}
-
-func UnicodeBoardWithBorders(board []string) string {
+func ToString(board []string) string {
 	/*
 		claude.ai is responsible for this satanic child of a function, but it does work like a charm
 	*/
@@ -129,12 +112,7 @@ func UnicodeBoardWithBorders(board []string) string {
 	return result.String()
 }
 
-func Display(b *board.Board) {
-	unicodeBoard := ToUnicodeBoard(BitboardMappingAll(b))
-	fmt.Println(UnicodeBoard(unicodeBoard))
-}
-
-func DisplayPretty(b *board.Board) {
-	unicodeBoard := ToUnicodeBoard(BitboardMappingAll(b))
-	fmt.Println(UnicodeBoardWithBorders(unicodeBoard))
+func Display(p *board.Position) {
+	unicodeBoard := FromMapping(BitboardMappingAll(p))
+	fmt.Println(ToString(unicodeBoard))
 }

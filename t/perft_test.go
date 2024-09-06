@@ -1,8 +1,8 @@
 package t
 
 import (
-	"endtner.dev/nChess/board"
-	"endtner.dev/nChess/movegenerator"
+	"endtner.dev/nChess/internal/engine"
+	"endtner.dev/nChess/internal/utils"
 	"fmt"
 	"strings"
 	"testing"
@@ -16,14 +16,14 @@ import (
 func doPerftTest(positionName string, positionFen string, expectedPerftResults []int64) bool {
 	testingResult := true
 
-	b := board.New(positionFen)
+	b := utils.FromFen(positionFen)
 
 	resultString := strings.Builder{}
 
 	for i := range len(expectedPerftResults) {
 
 		start := time.Now()
-		perftResult := movegenerator.Perft(b, i, -1)
+		perftResult := engine.Perft(b, i, -1)
 
 		resultString.WriteString(fmt.Sprintf("[%s] Perft(%d) %d, (Expected %d), match=%t, runtime=%s\n", positionName, i, perftResult, expectedPerftResults[i], perftResult == expectedPerftResults[i], time.Since(start)))
 		if expectedPerftResults[i] != perftResult {

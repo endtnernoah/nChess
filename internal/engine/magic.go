@@ -1,7 +1,7 @@
-package movegenerator
+package engine
 
 import (
-	"endtner.dev/nChess/board/piece"
+	"endtner.dev/nChess/internal/board"
 	"math"
 	"math/bits"
 	"math/rand"
@@ -20,10 +20,10 @@ func Mask(square int, pieceType uint8) uint64 {
 	offsetIndexStart := 0
 	offsetIndexEnd := 8
 
-	if pieceType == piece.Rook {
+	if pieceType == board.Rook {
 		offsetIndexEnd = 4
 	}
-	if pieceType == piece.Bishop {
+	if pieceType == board.Bishop {
 		offsetIndexStart = 4
 	}
 
@@ -48,10 +48,10 @@ func ValidMoves(square int, pieceType uint8, occupation uint64) uint64 {
 	offsetIndexStart := 0
 	offsetIndexEnd := 8
 
-	if pieceType == piece.Rook {
+	if pieceType == board.Rook {
 		offsetIndexEnd = 4
 	}
-	if pieceType == piece.Bishop {
+	if pieceType == board.Bishop {
 		offsetIndexStart = 4
 	}
 
@@ -206,7 +206,7 @@ var RookMoveTable = func() []uint64 {
 		occupancies := GenerateOccupancies(entry.Mask)
 		for _, occ := range occupancies {
 			index := int((occ * entry.Magic) >> entry.Shift)
-			rookMoveTable[entry.Offset+index] = ValidMoves(square, piece.Rook, occ)
+			rookMoveTable[entry.Offset+index] = ValidMoves(square, board.Rook, occ)
 		}
 	}
 
@@ -296,7 +296,7 @@ var BishopMoveTable = func() []uint64 {
 		occupancies := GenerateOccupancies(entry.Mask)
 		for _, occ := range occupancies {
 			index := int((occ * entry.Magic) >> entry.Shift)
-			bishopMoveTable[entry.Offset+index] = ValidMoves(square, piece.Bishop, occ)
+			bishopMoveTable[entry.Offset+index] = ValidMoves(square, board.Bishop, occ)
 		}
 	}
 

@@ -1,7 +1,7 @@
-package movegenerator
+package engine
 
 import (
-	"endtner.dev/nChess/board/boardhelper"
+	"endtner.dev/nChess/internal/board"
 )
 
 var DirectionalOffsets = []int{8, -8, -1, 1, 7, -7, 9, -9}
@@ -41,7 +41,7 @@ var ComputedKnightMoves = func() []uint64 {
 	for startIndex := range 64 {
 		for _, offset := range KnightOffsets {
 			targetIndex := startIndex + offset
-			if boardhelper.IsValidKnightMove(startIndex, targetIndex) {
+			if board.IsValidKnightMove(startIndex, targetIndex) {
 				moves[startIndex] |= 1 << targetIndex
 			}
 		}
@@ -73,10 +73,10 @@ var ComputedPawnMoves = func() [][]uint64 {
 		targetIndexWhite := startIndex + 8
 		targetIndexBlack := startIndex - 8
 
-		if boardhelper.IsValidStraightMove(startIndex, targetIndexWhite) {
+		if board.IsValidStraightMove(startIndex, targetIndexWhite) {
 			moves[0][startIndex] |= 1 << targetIndexWhite
 		}
-		if boardhelper.IsValidStraightMove(startIndex, targetIndexBlack) {
+		if board.IsValidStraightMove(startIndex, targetIndexBlack) {
 			moves[1][startIndex] |= 1 << targetIndexBlack
 		}
 	}
@@ -93,17 +93,17 @@ var ComputedPawnAttacks = func() [][]uint64 {
 		targetIndexWhite := startIndex + 8
 		targetIndexBlack := startIndex - 8
 
-		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexWhite+1) {
+		if board.IsValidDiagonalMove(startIndex, targetIndexWhite+1) {
 			moves[0][startIndex] |= 1 << (targetIndexWhite + 1)
 		}
-		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexWhite-1) {
+		if board.IsValidDiagonalMove(startIndex, targetIndexWhite-1) {
 			moves[0][startIndex] |= 1 << (targetIndexWhite - 1)
 		}
 
-		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexBlack+1) {
+		if board.IsValidDiagonalMove(startIndex, targetIndexBlack+1) {
 			moves[1][startIndex] |= 1 << (targetIndexBlack + 1)
 		}
-		if boardhelper.IsValidDiagonalMove(startIndex, targetIndexBlack-1) {
+		if board.IsValidDiagonalMove(startIndex, targetIndexBlack-1) {
 			moves[1][startIndex] |= 1 << (targetIndexBlack - 1)
 		}
 	}

@@ -1,4 +1,4 @@
-package piece
+package board
 
 var White uint8 = 0b00000
 var Black uint8 = 0b01000
