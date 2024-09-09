@@ -8,7 +8,6 @@ import (
 )
 
 var startPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-var testPosition = "8/2p5/3p4/KP5r/1R2Pp1k/8/6P1/8 b - e3 0 1"
 
 func main() {
 	p := utils.FromFen(startPosition)

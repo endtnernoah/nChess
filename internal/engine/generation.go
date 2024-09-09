@@ -56,7 +56,7 @@ func LegalMoves(p *board.Position) []board.Move {
 		blockers := allPieces & ^(1 << friendlyKingIndex)
 
 		for pieces != 0 {
-			opponentSlidingAttacks |= GetSliderMoves(bits.TrailingZeros64(pieces), blockers, orthogonal)
+			opponentSlidingAttacks |= PGetSliderMoves(bits.TrailingZeros64(pieces), blockers, orthogonal)
 			pieces &= pieces - 1
 		}
 	}
@@ -173,12 +173,12 @@ func LegalMoves(p *board.Position) []board.Move {
 		maskedBlockers := (allPieces | epBlockers) & ^(allPieces & epBlockers)
 
 		if opponentOrthogonalSliders != 0 {
-			rookAttacks := GetRookMoves(friendlyKingIndex, maskedBlockers)
+			rookAttacks := PGetRookMoves(friendlyKingIndex, maskedBlockers)
 			return (rookAttacks & opponentOrthogonalSliders) != 0
 		}
 
 		if opponentDiagonalSliders != 0 {
-			bishopAttacks := GetBishopMoves(friendlyKingIndex, maskedBlockers)
+			bishopAttacks := PGetBishopMoves(friendlyKingIndex, maskedBlockers)
 			return (bishopAttacks & opponentDiagonalSliders) != 0
 		}
 
@@ -341,7 +341,7 @@ func LegalMoves(p *board.Position) []board.Move {
 			pieceIndex := bits.TrailingZeros64(friendlyOrthogonalSliders | friendlyDiagonalSliders)
 
 			if friendlyOrthogonalSliders&(1<<pieceIndex) != 0 {
-				sliderMoves := GetRookMoves(pieceIndex, allPieces) & ^friendlyPieces & validMoveMask
+				sliderMoves := PGetRookMoves(pieceIndex, allPieces) & ^friendlyPieces & validMoveMask
 
 				if (friendlyPinRays & (1 << pieceIndex)) != 0 {
 					sliderMoves &= AlignmentMask[pieceIndex][friendlyKingIndex]
@@ -359,7 +359,7 @@ func LegalMoves(p *board.Position) []board.Move {
 				friendlyOrthogonalSliders &= friendlyOrthogonalSliders - 1
 			}
 			if friendlyDiagonalSliders&(1<<pieceIndex) != 0 {
-				sliderMoves := GetBishopMoves(pieceIndex, allPieces) & ^friendlyPieces & validMoveMask
+				sliderMoves := PGetBishopMoves(pieceIndex, allPieces) & ^friendlyPieces & validMoveMask
 
 				if (friendlyPinRays & (1 << pieceIndex)) != 0 {
 					sliderMoves &= AlignmentMask[pieceIndex][friendlyKingIndex]
