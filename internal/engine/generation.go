@@ -429,6 +429,8 @@ func LegalMoves(p *board.Position) []board.Move {
 	KnightMoves()
 	TotalTimeKnightGeneration += time.Since(startKnightMoves)
 
+	p.UpdateTerminalState(len(pseudoLegalMoves) != 0, (opponentAttacks>>friendlyKingIndex)&1 != 0)
+
 	return pseudoLegalMoves[:index]
 }
 

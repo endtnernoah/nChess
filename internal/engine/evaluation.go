@@ -14,7 +14,7 @@ const (
 	QueenValue  = 1000
 )
 
-func Evaluate(p *board.Position) int {
+func Evaluate(p *board.Position) float64 {
 	score := 0
 
 	pawnDiff := bits.OnesCount64(p.Bitboards[p.FriendlyColor|board.Pawn]) - bits.OnesCount64(p.Bitboards[p.OpponentColor|board.Pawn])
@@ -30,5 +30,5 @@ func Evaluate(p *board.Position) int {
 		rookDiff*RookValue +
 		queenDiff*QueenValue
 
-	return score
+	return float64(score / 100)
 }
