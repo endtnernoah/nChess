@@ -191,7 +191,7 @@ func LegalMoves(p *board.Position) []board.Move {
 	var KingMoves = func() {
 		kingMoveMask := ComputedKingMoves[friendlyKingIndex] & ^friendlyPieces & ^opponentAttacks
 		for kingMoveMask != 0 {
-			pseudoLegalMoves[index] = board.New(friendlyKingIndex, bits.TrailingZeros64(kingMoveMask))
+			pseudoLegalMoves[index] = board.NewMove(friendlyKingIndex, bits.TrailingZeros64(kingMoveMask))
 			index++
 
 			kingMoveMask &= kingMoveMask - 1
@@ -235,7 +235,7 @@ func LegalMoves(p *board.Position) []board.Move {
 			(kingSideEmptyMask&allPieces) == 0 && // All fields are empty
 			board.IsIndexBitSet(kingSideRookIndex, friendlyRooks) { // There is a rook on its field
 
-			pseudoLegalMoves[index] = board.New(friendlyKingIndex, friendlyKingIndex+2, board.WithRookStartingSquare(kingSideRookIndex))
+			pseudoLegalMoves[index] = board.NewMove(friendlyKingIndex, friendlyKingIndex+2, board.WithRookStartingSquare(kingSideRookIndex))
 			index++
 		}
 
@@ -244,7 +244,7 @@ func LegalMoves(p *board.Position) []board.Move {
 			(queenSideEmptyMask&allPieces) == 0 &&
 			board.IsIndexBitSet(queenSideRookIndex, friendlyRooks) {
 
-			pseudoLegalMoves[index] = board.New(friendlyKingIndex, friendlyKingIndex-2, board.WithRookStartingSquare(queenSideRookIndex))
+			pseudoLegalMoves[index] = board.NewMove(friendlyKingIndex, friendlyKingIndex-2, board.WithRookStartingSquare(queenSideRookIndex))
 			index++
 		}
 	}
@@ -305,25 +305,25 @@ func LegalMoves(p *board.Position) []board.Move {
 				moveTargetIndex := bits.TrailingZeros64(validMoves)
 
 				if isPromotionRank {
-					pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Knight))
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Knight))
 					index++
-					pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Bishop))
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Bishop))
 					index++
-					pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Queen))
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Queen))
 					index++
-					pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Rook))
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithPromotion(p.FriendlyColor|board.Rook))
 					index++
 				} else {
 					if moveTargetIndex == p.EnPassantSquare {
 						if !IsEnPassantMovePinned(pieceIndex, moveTargetIndex, moveTargetIndex-p.PawnOffset) {
-							pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithEnPassantCaptureSquare(moveTargetIndex-p.PawnOffset))
+							pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithEnPassantCaptureSquare(moveTargetIndex-p.PawnOffset))
 							index++
 						}
 					} else if moveTargetIndex == targetIndex+p.PawnOffset {
-						pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex, board.WithEnPassantPassedSquare(moveTargetIndex-p.PawnOffset))
+						pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex, board.WithEnPassantPassedSquare(moveTargetIndex-p.PawnOffset))
 						index++
 					} else {
-						pseudoLegalMoves[index] = board.New(pieceIndex, moveTargetIndex)
+						pseudoLegalMoves[index] = board.NewMove(pieceIndex, moveTargetIndex)
 						index++
 					}
 				}
@@ -350,7 +350,7 @@ func LegalMoves(p *board.Position) []board.Move {
 				for sliderMoves != 0 {
 					targetIndex := bits.TrailingZeros64(sliderMoves)
 
-					pseudoLegalMoves[index] = board.New(pieceIndex, targetIndex)
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, targetIndex)
 					index++
 
 					sliderMoves &= sliderMoves - 1
@@ -368,7 +368,7 @@ func LegalMoves(p *board.Position) []board.Move {
 				for sliderMoves != 0 {
 					targetIndex := bits.TrailingZeros64(sliderMoves)
 
-					pseudoLegalMoves[index] = board.New(pieceIndex, targetIndex)
+					pseudoLegalMoves[index] = board.NewMove(pieceIndex, targetIndex)
 					index++
 
 					sliderMoves &= sliderMoves - 1
@@ -386,7 +386,7 @@ func LegalMoves(p *board.Position) []board.Move {
 			validMoves := ComputedKnightMoves[pieceIndex] & ^friendlyPieces & validMoveMask
 
 			for validMoves != 0 {
-				pseudoLegalMoves[index] = board.New(pieceIndex, bits.TrailingZeros64(validMoves))
+				pseudoLegalMoves[index] = board.NewMove(pieceIndex, bits.TrailingZeros64(validMoves))
 				index++
 
 				validMoves &= validMoves - 1
@@ -469,16 +469,14 @@ func Perft(p *board.Position, ply int, maxPly int) int64 {
 	}
 
 	for _, m := range legalMoves {
-		p.MakeMove(m)
+		np := p.MakeMove(m)
 
-		subNodes := Perft(p, ply-1, maxPly)
+		subNodes := Perft(np, ply-1, maxPly)
 		totalNodes += subNodes
 
 		if ply == maxPly {
-			fmt.Printf("%s: %d\n", board.PrintSimple(m), subNodes)
+			fmt.Printf("%s: %d\n", board.MoveToString(m), subNodes)
 		}
-
-		p.UnmakeMove()
 	}
 
 	tt[ply][p.Zobrist] = totalNodes
