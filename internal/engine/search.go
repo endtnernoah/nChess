@@ -5,11 +5,13 @@ import (
 	"math"
 )
 
-func NegaMax(p *board.Position, depth int, alpha, beta float64, tt *TranspositionTable) float64 {
+func NegaMax(p *board.Position, depth int, alpha, beta float64, tt *TranspositionTable, killerMoves [][2]board.Move) float64 {
 	alpha0 := alpha
 
+	ttMove := board.Move{}
 	entry, found := tt.Probe(p.Zobrist)
 	if found && entry.Depth >= depth {
+		ttMove = entry.Move
 		if entry.Type == ExactScore {
 			return entry.Score
 		} else if entry.Type == LowerBound {
@@ -26,17 +28,23 @@ func NegaMax(p *board.Position, depth int, alpha, beta float64, tt *Transpositio
 		return Evaluate(p)
 	}
 
+	orderedMoves := OrderMoves(p, LegalMoves(p), ttMove, killerMoves[depth])
+
 	var bestMove board.Move
 	currentEval := math.Inf(-1)
-	for _, m := range LegalMoves(p) {
+	for _, m := range orderedMoves {
 		np := p.MakeMove(m)
-		score := -NegaMax(np, depth-1, -beta, -alpha, tt)
+		score := -NegaMax(np, depth-1, -beta, -alpha, tt, killerMoves)
 		if score > currentEval {
 			currentEval = score
 			bestMove = m
 		}
 		alpha = math.Max(alpha, currentEval)
 		if alpha >= beta {
+			if p.Pieces[m.TargetIndex] == 0 {
+				killerMoves[depth][1] = killerMoves[depth][0]
+				killerMoves[depth][0] = m
+			}
 			break
 		}
 	}
@@ -56,6 +64,8 @@ func NegaMax(p *board.Position, depth int, alpha, beta float64, tt *Transpositio
 
 func Search(p *board.Position, depth int) board.Move {
 	tt := NewTranspositionTable()
+	killerMoves := make([][2]board.Move, depth+1)
+
 	bestMove := board.Move{}
 	bestValue := math.Inf(-1)
 	alpha := math.Inf(-1)
@@ -63,7 +73,7 @@ func Search(p *board.Position, depth int) board.Move {
 
 	for _, m := range LegalMoves(p) {
 		np := p.MakeMove(m)
-		value := -NegaMax(np, depth-1, -beta, -alpha, tt)
+		value := -NegaMax(np, depth-1, -beta, -alpha, tt, killerMoves)
 		if value > bestValue {
 			bestValue = value
 			bestMove = m

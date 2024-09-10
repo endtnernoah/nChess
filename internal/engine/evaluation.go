@@ -14,6 +14,23 @@ const (
 	QueenValue  = 1000
 )
 
+func PieceValue(piece uint8) int {
+	switch piece {
+	case board.Pawn:
+		return PawnValue
+	case board.Knight:
+		return KnightValue
+	case board.Bishop:
+		return BishopValue
+	case board.Rook:
+		return RookValue
+	case board.Queen:
+		return QueenValue
+	default:
+		return 0
+	}
+}
+
 func Evaluate(p *board.Position) float64 {
 	score := 0
 
