@@ -22,7 +22,7 @@ func main() {
 	// startTotal := time.Now()
 	// fmt.Printf("Perft(%d)=%d, took %s\n", ply, engine.Perft(p, ply, ply), time.Since(startTotal))
 
-	searchDepth := 10
+	searchDepth := 32
 	startSearch := time.Now()
 	fmt.Println(board.MoveToString(engine.IterativeDeepeningSearch(p, searchDepth, 7*time.Second)))
 	fmt.Printf("Search(%d) took %s\n", searchDepth, time.Since(startSearch))
