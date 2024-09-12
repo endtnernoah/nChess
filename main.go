@@ -24,7 +24,7 @@ func main() {
 
 	searchDepth := 32
 	startSearch := time.Now()
-	fmt.Println(board.MoveToString(engine.IterativeDeepeningSearch(p, searchDepth, 7*time.Second)))
+	fmt.Println(board.MoveToString(engine.IterativeDeepeningSearch(p, searchDepth, 15*time.Second)))
 	fmt.Printf("Search(%d) took %s\n", searchDepth, time.Since(startSearch))
 
 	fmt.Println("")

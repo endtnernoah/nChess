@@ -4,6 +4,7 @@ import (
 	"endtner.dev/nChess/internal/board"
 	"endtner.dev/nChess/internal/engine"
 	"endtner.dev/nChess/internal/game"
+	"time"
 )
 
 type EnginePlayer struct {
@@ -19,5 +20,5 @@ func (e EnginePlayer) GetPlayerType() byte {
 }
 
 func (e EnginePlayer) AwaitMove(p *board.Position, legalMoveTable *map[string]board.Move) board.Move {
-	return engine.Search(p, 9)
+	return engine.IterativeDeepeningSearch(p, 32, 15*time.Second)
 }

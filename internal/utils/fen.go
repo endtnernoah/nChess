@@ -10,6 +10,8 @@ import (
 	"unicode"
 )
 
+var StartPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
 func FromFen(fenString string) *board.Position {
 	p := board.Position{}
 
@@ -158,7 +160,7 @@ func ToFEN(p *board.Position) string {
 	if p.WhiteToMove {
 		fen.WriteString("w")
 	} else {
-		fen.WriteString("p")
+		fen.WriteString("b")
 	}
 
 	// Castling availability
